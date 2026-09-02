@@ -1,0 +1,12 @@
+{
+  "apps": [
+    {
+      "app_id": "app_912ec933-b93b-4612-b0f3-89d1351070b9",
+      "org_id": "user_cb6cfedc-2e83-467e-be20-bff5fc56b26e",
+      "deploy_url": "https://github.com/petertwitchett/clever-ai-teams.git",
+      "git_ssh_url": "https://github.com/petertwitchett/clever-ai-teams.git",
+      "name": "clever-ai-teams",
+      "alias": "clever-ai-teams"
+    }
+  ]
+}

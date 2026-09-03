@@ -86,21 +86,21 @@ export function Sidebar() {
   return (
     <aside
       className={`fixed top-0 left-0 bottom-0 z-30 flex flex-col bg-surface-sidebar border-r border-surface-border transition-all duration-300 ${
-        sidebarCollapsed ? "w-20" : "w-64"
+        sidebarCollapsed ? "w-20" : "w-[270px]"
       }`}
     >
       {/* Brand Header */}
-      <div className="flex items-center justify-between h-18 px-4 border-b border-surface-border">
-        <Link href="/" className="flex items-center gap-3 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 min-h-[72px] border-b border-surface-border">
+        <Link href="/" className="flex items-center gap-3 overflow-hidden group">
           {/* Stylized Materialize M Logo */}
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-primary-hover flex items-center justify-center text-white font-black text-xl shadow-mat-glow shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-primary-hover flex items-center justify-center text-white font-black text-xl shadow-mat-glow shrink-0 group-hover:scale-105 transition-transform">
             <span className="tracking-tighter">M</span>
           </div>
           {!sidebarCollapsed && (
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-base text-content-main tracking-tight truncate flex items-center gap-1.5">
                 Clever AI Team
-                <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
+                <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" />
               </span>
               <span className="text-[11px] text-content-muted truncate font-medium">
                 Multi-Agent Studio
@@ -124,11 +124,11 @@ export function Sidebar() {
       </div>
 
       {/* Navigation Links */}
-      <div className="flex-1 py-4 px-3 overflow-y-auto space-y-6">
+      <div className="flex-1 py-5 px-3.5 overflow-y-auto space-y-6">
         {menuSections.map((section, idx) => (
           <div key={idx} className="space-y-1">
             {!sidebarCollapsed && (
-              <div className="px-3 pb-1 text-[11px] font-bold tracking-wider text-content-subtle uppercase">
+              <div className="px-3.5 pb-1.5 text-[11px] font-bold tracking-wider text-content-subtle uppercase">
                 {section.heading}
               </div>
             )}

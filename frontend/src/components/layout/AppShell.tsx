@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
 import { ThemeCustomizer } from "@/components/theme/ThemeCustomizer";
@@ -12,6 +13,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
+  const { sidebarCollapsed } = useTheme();
 
   const isAuthPage = pathname === "/login" || pathname === "/register";
 
@@ -71,7 +73,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 md:pl-64">
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
+          sidebarCollapsed ? "md:pl-20" : "md:pl-[270px]"
+        }`}
+      >
         <Navbar />
         <main className="flex-1 px-4 md:px-6 pb-10">{children}</main>
       </div>

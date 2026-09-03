@@ -59,36 +59,13 @@ class ApiClient {
   /**
    * Acquire a valid platform access token if none exists in localStorage.
    */
-  public async ensureAuth(): Promise<string> {
+  public async ensureAuth(): Promise<string | null> {
     if (this.token) return this.token;
-
-    if (this.authPromise) return this.authPromise;
-
-    this.authPromise = (async () => {
-      try {
-        const res = await fetch(`${this.baseUrl}/auth/demo-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.access_token) {
-            this.setToken(data.access_token);
-            return data.access_token;
-          }
-        }
-      } catch (err: any) {
-        console.warn("Auto-provisioning session token failed:", err?.message || err);
-      } finally {
-        this.authPromise = null;
-      }
-      return "";
-    })();
-
-    return this.authPromise;
+    if (typeof window !== "undefined") {
+      this.token = localStorage.getItem("clever_ai_token");
+      if (this.token) return this.token;
+    }
+    return null;
   }
 
   private async request<T>(
@@ -112,10 +89,12 @@ class ApiClient {
     const res = await fetch(url, { ...options, headers });
 
     // Handle token expiration / 401 unauthenticated
-    if (res.status === 401 && retryCount === 0) {
+    if (res.status === 401) {
       this.setToken(null);
-      await this.ensureAuth();
-      return this.request<T>(endpoint, options, 1);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("clever_ai_token");
+      }
+      throw new Error("401 Unauthorized: Session expired or invalid token");
     }
 
     if (!res.ok) {
@@ -144,19 +123,76 @@ class ApiClient {
 
   // --- Auth ---
   async login(email: string, password: string): Promise<{ access_token: string }> {
-    const res = await this.request<{ access_token: string }>("/auth/login", {
+    const url = `${this.baseUrl}/auth/login`;
+    const res = await fetch(url, {
       method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    this.setToken(res.access_token);
-    return res;
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorMsg = "Invalid email or password";
+      try {
+        const parsed = JSON.parse(errorText);
+        if (parsed.detail) {
+          errorMsg = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+        }
+      } catch {}
+      throw new Error(errorMsg);
+    }
+
+    const data = await res.json();
+    this.setToken(data.access_token);
+    return data;
   }
 
   async register(email: string, password: string, full_name: string): Promise<User> {
-    return await this.request<User>("/auth/register", {
+    const url = `${this.baseUrl}/auth/register`;
+    const res = await fetch(url, {
       method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ email, password, full_name }),
     });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorMsg = "Registration failed";
+      try {
+        const parsed = JSON.parse(errorText);
+        if (parsed.detail) {
+          errorMsg = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+        }
+      } catch {}
+      throw new Error(errorMsg);
+    }
+
+    return await res.json();
+  }
+
+  async getDemoToken(): Promise<{ access_token: string }> {
+    const url = `${this.baseUrl}/auth/demo-token`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to acquire demo token");
+    }
+
+    const data = await res.json();
+    this.setToken(data.access_token);
+    return data;
+  }
+
+  logout(): void {
+    this.setToken(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("clever_ai_token");
+      localStorage.removeItem("clever_ai_user");
+    }
   }
 
   async getMe(): Promise<User> {

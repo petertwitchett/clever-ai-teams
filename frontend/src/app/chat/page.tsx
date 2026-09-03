@@ -374,13 +374,13 @@ function ChatContent() {
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-4 md:px-8 py-6 relative"
+          className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-10 py-8 relative"
         >
           {/* Centered Constrained Column for Optimal Reading Ergonomics */}
-          <div className="max-w-4xl mx-auto w-full space-y-4 pb-2">
+          <div className="max-w-4xl mx-auto w-full space-y-6 pb-6">
             {messages.length === 0 ? (
               /* Hero Empty State */
-              <div className="py-8 flex flex-col items-center justify-center text-center space-y-6">
+              <div className="py-12 flex flex-col items-center justify-center text-center space-y-6">
                 <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-primary/20 via-amber-500/15 to-primary/10 text-primary flex items-center justify-center shadow-mat-glow animate-float-slow border border-primary/30">
                   <Bot className="w-10 h-10" />
                 </div>
@@ -395,14 +395,14 @@ function ChatContent() {
                 </div>
 
                 {/* Quick Prompts 2x2 Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl pt-2 text-left">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full max-w-2xl pt-2 text-left">
                   {quickPrompts.map((item, i) => (
                     <button
                       key={i}
                       onClick={() => handleSendMessage(item.prompt)}
-                      className="p-3.5 rounded-2xl border border-surface-border bg-surface-card hover:border-primary/50 hover:shadow-mat-hover text-content-main transition-all group flex items-start gap-3"
+                      className="p-4 rounded-2xl border border-surface-border bg-surface-card hover:border-primary/50 hover:shadow-mat-hover text-content-main transition-all group flex items-start gap-3"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-surface-hover flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <div className="w-9 h-9 rounded-xl bg-surface-hover flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                         {item.icon}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -425,19 +425,19 @@ function ChatContent() {
 
             {/* Deliberation Streaming Indicator */}
             {isStreaming && (
-              <div className="max-w-3xl rounded-2xl p-4 bg-gradient-to-r from-primary/10 via-amber-500/5 to-surface-card border border-primary/30 text-xs shadow-mat-glow my-4 animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-primary/20 text-primary flex items-center justify-center shrink-0">
-                    <RefreshCw className="w-4 h-4 animate-spin text-primary" />
+              <div className="max-w-3xl rounded-2xl p-5 bg-gradient-to-r from-primary/10 via-amber-500/5 to-surface-card border border-primary/30 text-xs shadow-mat-glow my-6 animate-pulse">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-primary/20 text-primary flex items-center justify-center shrink-0">
+                    <RefreshCw className="w-4.5 h-4.5 animate-spin text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h5 className="font-bold text-xs text-content-main flex items-center gap-2">
                       <span>Autonomous Collective Active</span>
-                      <span className="text-[10px] px-2 py-0.2 rounded-full bg-primary/20 text-primary font-mono">
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/20 text-primary font-mono font-semibold">
                         Dual-Ledger Loop
                       </span>
                     </h5>
-                    <p className="text-[11px] text-content-muted mt-0.5 truncate font-mono">
+                    <p className="text-xs text-content-muted mt-0.5 truncate font-mono">
                       {streamingStep}
                     </p>
                   </div>
@@ -452,7 +452,7 @@ function ChatContent() {
           {showScrollBottom && (
             <button
               onClick={scrollToBottom}
-              className="absolute bottom-4 right-8 p-2.5 rounded-full bg-surface-card border border-surface-border text-primary shadow-mat-hover hover:scale-110 transition-all z-20 flex items-center gap-1.5 text-xs font-semibold"
+              className="absolute bottom-6 right-8 p-3 rounded-full bg-surface-card border border-surface-border text-primary shadow-mat-hover hover:scale-110 transition-all z-20 flex items-center gap-2 text-xs font-semibold"
             >
               <ArrowDown className="w-4 h-4" />
               <span>Jump to bottom</span>
@@ -461,19 +461,19 @@ function ChatContent() {
         </div>
 
         {/* 3. Floating State-of-the-Art Composer (Input Box) */}
-        <div className="p-3 md:p-4 bg-gradient-to-t from-surface-bg via-surface-bg/95 to-transparent z-10">
-          <div className="max-w-4xl mx-auto w-full space-y-2.5">
+        <div className="p-4 sm:p-6 bg-gradient-to-t from-surface-bg via-surface-bg/95 to-transparent z-10">
+          <div className="max-w-4xl mx-auto w-full space-y-3.5">
             {/* Quick Prompt Suggestion Pills (Horizontal Scrollable Carousel) */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-              <span className="text-[10px] font-bold text-content-subtle uppercase tracking-wider shrink-0 flex items-center gap-1 px-1">
-                <Sparkles className="w-3 h-3 text-primary" />
+            <div className="flex items-center gap-2.5 overflow-x-auto pb-1.5 no-scrollbar text-xs">
+              <span className="text-[10px] font-bold text-content-subtle uppercase tracking-wider shrink-0 flex items-center gap-1.5 px-1">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
                 <span>Suggestions:</span>
               </span>
               {quickPrompts.map((item, i) => (
                 <button
                   key={i}
                   onClick={() => setInputText(item.prompt)}
-                  className="px-3 py-1.5 rounded-full border border-surface-border bg-surface-card/90 hover:border-primary/50 text-content-muted hover:text-content-main hover:bg-surface-hover text-xs font-medium shrink-0 transition-all flex items-center gap-1.5 shadow-2xs"
+                  className="px-3.5 py-2 rounded-full border border-surface-border bg-surface-card hover:border-primary/50 text-content-muted hover:text-content-main hover:bg-surface-hover text-xs font-semibold shrink-0 transition-all flex items-center gap-2 shadow-2xs hover:-translate-y-0.5"
                 >
                   {item.icon}
                   <span>{item.title}</span>
@@ -482,21 +482,27 @@ function ChatContent() {
             </div>
 
             {/* Composer Capsule Card */}
-            <div className="rounded-2xl border border-surface-border bg-surface-card/95 backdrop-blur-lg shadow-mat p-3 transition-all focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 focus-within:shadow-mat-glow">
+            <div className="rounded-2xl border border-surface-border bg-surface-card/95 backdrop-blur-lg shadow-mat p-4 sm:p-5 transition-all focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 focus-within:shadow-mat-glow">
               {/* Composer Header Pill */}
-              <div className="flex items-center justify-between pb-2 mb-1.5 border-b border-surface-border/60 text-[11px] text-content-subtle px-1">
+              <div className="flex items-center justify-between pb-3 mb-2 border-b border-surface-border/70 text-xs text-content-subtle px-1">
                 <div className="flex items-center gap-2 font-medium">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-content-muted">Target Collective:</span>
-                  <span className="font-bold text-content-main truncate max-w-[260px]">
+                  <span className="font-bold text-content-main truncate max-w-[280px]">
                     {activeGraph?.name || "Clever AI Team"}
                   </span>
                 </div>
 
                 <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono text-content-subtle">
-                  <span>Enter ↵ to send</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface-hover border border-surface-border text-content-muted font-mono">
+                    Enter ↵
+                  </kbd>
+                  <span>to send</span>
                   <span>•</span>
-                  <span>Shift + Enter for newline</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-surface-hover border border-surface-border text-content-muted font-mono">
+                    Shift + Enter
+                  </kbd>
+                  <span>for newline</span>
                 </div>
               </div>
 
@@ -509,23 +515,23 @@ function ChatContent() {
                 onKeyDown={handleKeyDown}
                 placeholder="Instruct the autonomous agent collective (e.g. 'Audit this architecture against security invariants and draft execution milestones')..."
                 disabled={isStreaming}
-                className="w-full bg-transparent text-xs sm:text-sm text-content-main placeholder:text-content-subtle resize-none focus:outline-hidden leading-relaxed px-1 py-1 max-h-[180px] min-h-[44px]"
+                className="w-full bg-transparent text-sm sm:text-base text-content-main placeholder:text-content-subtle resize-none focus:outline-hidden leading-relaxed px-1 py-1.5 max-h-[220px] min-h-[56px]"
               />
 
               {/* Composer Footer Actions & Send Button */}
-              <div className="flex items-center justify-between pt-2 border-t border-surface-border/60 mt-1">
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between pt-3 border-t border-surface-border/70 mt-2">
+                <div className="flex items-center gap-2">
                   {inputText.trim().length > 0 && (
                     <button
                       onClick={() => setInputText("")}
-                      className="p-1.5 rounded-lg hover:bg-surface-hover text-content-muted hover:text-content-main transition-colors text-[11px] flex items-center gap-1"
+                      className="p-1.5 px-2.5 rounded-lg hover:bg-surface-hover text-content-muted hover:text-content-main transition-colors text-xs flex items-center gap-1.5 border border-surface-border/50"
                       title="Clear prompt"
                     >
                       <XCircle className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Clear</span>
+                      <span>Clear</span>
                     </button>
                   )}
-                  <span className="text-[10px] font-mono text-content-subtle px-2">
+                  <span className="text-[11px] font-mono text-content-subtle px-2.5 py-1 rounded-lg bg-surface-hover/60 border border-surface-border/50">
                     {inputText.length > 0 ? `${inputText.length} chars` : "Ready"}
                   </span>
                 </div>
@@ -534,7 +540,7 @@ function ChatContent() {
                   <button
                     onClick={() => handleSendMessage()}
                     disabled={!inputText.trim() || isStreaming}
-                    className="mat-btn mat-btn-primary px-4 py-2 text-xs font-semibold flex items-center gap-2 rounded-xl shadow-mat-glow disabled:opacity-40 disabled:cursor-not-allowed hover:scale-102 active:scale-98 transition-all"
+                    className="mat-btn mat-btn-primary px-5 py-2.5 text-xs font-bold flex items-center gap-2 rounded-xl shadow-mat-glow disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
                     {isStreaming ? (
                       <>

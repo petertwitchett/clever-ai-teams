@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Default Primary: Materialize Purple (#7367F0) */
+  --color-primary: 115 103 240;
+  --color-primary-hover: 94 80 238;
+  --color-primary-light: 234 232 253;
+  --color-primary-fg: #ffffff;
+  --color-primary-hex: #7367f0;
+
+  /* Light Theme Surfaces */
+  --surface-bg: #f8f7fa;
+  --surface-card: #ffffff;
+  --surface-sidebar: #ffffff;
+  --surface-navbar: rgba(255, 255, 255, 0.95);
+  --surface-border: #e6e6e8;
+  --surface-border-subtle: #f1f1f3;
+  --surface-hover: #f3f2f8;
+
+  /* Typography */
+  --text-main: #38354d;
+  --text-muted: #6e6b7b;
+  --text-subtle: #b9b9c3;
+
+  /* Elevation */
+  --card-shadow: 0 4px 18px 0 rgba(47, 43, 61, 0.08);
+  --navbar-shadow: 0 2px 12px 0 rgba(47, 43, 61, 0.06);
+}
+
+/* Dark Theme */
+.dark {
+  --surface-bg: #25293c;
+  --surface-card: #2f3349;
+  --surface-sidebar: #2b2c40;
+  --surface-navbar: rgba(47, 51, 73, 0.95);
+  --surface-border: #3b4056;
+  --surface-border-subtle: #32374c;
+  --surface-hover: #363b53;
+
+  --text-main: #cfcce4;
+  --text-muted: #9598b2;
+  --text-subtle: #6b7089;
+
+  --card-shadow: 0 4px 18px 0 rgba(15, 20, 34, 0.4);
+  --navbar-shadow: 0 2px 12px 0 rgba(15, 20, 34, 0.3);
+}
+
+/* Color Schemes */
+[data-theme-color="purple"] {
+  --color-primary: 115 103 240;
+  --color-primary-hover: 94 80 238;
+  --color-primary-light: 234 232 253;
+  --color-primary-hex: #7367f0;
+}
+
+[data-theme-color="orange"] {
+  --color-primary: 255 159 67;
+  --color-primary-hover: 230 138 48;
+  --color-primary-light: 255 240 225;
+  --color-primary-hex: #ff9f43;
+}
+
+[data-theme-color="blue"] {
+  --color-primary: 0 207 221;
+  --color-primary-hover: 0 181 194;
+  --color-primary-light: 221 251 252;
+  --color-primary-hex: #00cfdd;
+}
+
+[data-theme-color="green"] {
+  --color-primary: 40 199 111;
+  --color-primary-hover: 32 163 90;
+  --color-primary-light: 221 247 233;
+  --color-primary-hex: #28c76f;
+}
+
+[data-theme-color="red"] {
+  --color-primary: 234 84 85;
+  --color-primary-hover: 199 56 57;
+  --color-primary-light: 252 228 228;
+  --color-primary-hex: #ea5455;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--surface-bg);
+  color: var(--text-main);
+  font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Materialize Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 160, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--color-primary), 0.6);
+}

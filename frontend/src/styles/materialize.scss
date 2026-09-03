@@ -1,0 +1,158 @@
+/* Materialize Design Component Utilities */
+
+.mat-card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--card-shadow);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover {
+    box-shadow: 0 6px 22px 0 rgba(47, 43, 61, 0.12);
+  }
+}
+
+.dark .mat-card:hover {
+  box-shadow: 0 6px 22px 0 rgba(15, 20, 34, 0.55);
+}
+
+.mat-navbar-floating {
+  background-color: var(--surface-navbar);
+  border: 1px solid var(--surface-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--navbar-shadow);
+  backdrop-filter: blur(8px);
+}
+
+/* Rounded Pill Navigation */
+.mat-nav-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  color: var(--text-main);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover {
+    background-color: var(--surface-hover);
+    color: rgb(var(--color-primary));
+    transform: translateX(3px);
+  }
+
+  &.active {
+    background: linear-gradient(72.47deg, rgb(var(--color-primary)) 22.16%, rgb(var(--color-primary-hover)) 76.47%);
+    color: #ffffff !important;
+    box-shadow: 0px 3px 12px 0px rgba(var(--color-primary), 0.45);
+
+    .nav-icon {
+      color: #ffffff !important;
+    }
+  }
+}
+
+/* Materialize Badges */
+.mat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+
+  &.badge-primary {
+    background-color: rgba(var(--color-primary), 0.14);
+    color: rgb(var(--color-primary));
+  }
+  &.badge-success {
+    background-color: rgba(40, 199, 111, 0.14);
+    color: #28c76f;
+  }
+  &.badge-warning {
+    background-color: rgba(255, 159, 67, 0.14);
+    color: #ff9f43;
+  }
+  &.badge-danger {
+    background-color: rgba(234, 84, 85, 0.14);
+    color: #ea5455;
+  }
+  &.badge-info {
+    background-color: rgba(0, 207, 221, 0.14);
+    color: #00cfdd;
+  }
+  &.badge-secondary {
+    background-color: rgba(168, 170, 174, 0.15);
+    color: var(--text-muted);
+  }
+}
+
+/* Buttons */
+.mat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  outline: none;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.mat-btn-primary {
+  background: linear-gradient(72.47deg, rgb(var(--color-primary)) 22.16%, rgb(var(--color-primary-hover)) 76.47%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px 0 rgba(var(--color-primary), 0.35);
+
+  &:hover {
+    box-shadow: 0 4px 14px 0 rgba(var(--color-primary), 0.5);
+    filter: brightness(1.04);
+  }
+}
+
+.mat-btn-outline {
+  background: transparent;
+  border: 1px solid var(--surface-border);
+  color: var(--text-main);
+
+  &:hover {
+    border-color: rgb(var(--color-primary));
+    color: rgb(var(--color-primary));
+    background-color: rgba(var(--color-primary), 0.06);
+  }
+}
+
+/* Input Fields */
+.mat-input {
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--surface-border);
+  background-color: var(--surface-card);
+  color: var(--text-main);
+  font-size: 0.875rem;
+  transition: all 0.15s ease;
+
+  &::placeholder {
+    color: var(--text-subtle);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: rgb(var(--color-primary));
+    box-shadow: 0 0 0 3px rgba(var(--color-primary), 0.18);
+  }
+}

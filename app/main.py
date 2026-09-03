@@ -200,17 +200,58 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
-    @app.get("/", include_in_schema=False)
-    async def root():
-        return {
-            "name": settings.APP_NAME,
-            "version": settings.APP_VERSION,
-            "docs": "/docs",
-            "redoc": "/redoc",
-            "openapi": "/openapi.json",
-            "health": "/health",
-            "api": settings.API_V1_PREFIX,
-        }
+    import os
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    static_dir = os.getenv("STATIC_DIR", "/srv/static")
+    if not os.path.isdir(static_dir):
+        candidate = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "out")
+        if os.path.isdir(candidate):
+            static_dir = candidate
+
+    if os.path.isdir(static_dir):
+        next_assets = os.path.join(static_dir, "_next")
+        if os.path.isdir(next_assets):
+            app.mount("/_next", StaticFiles(directory=next_assets), name="next_assets")
+
+        @app.get("/", include_in_schema=False)
+        async def root():
+            root_index = os.path.join(static_dir, "index.html")
+            if os.path.isfile(root_index):
+                return FileResponse(root_index)
+            return {
+                "name": settings.APP_NAME,
+                "version": settings.APP_VERSION,
+                "docs": "/docs",
+                "health": "/health",
+            }
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_spa_page(full_path: str):
+            clean_path = full_path.strip("/")
+            target = os.path.join(static_dir, clean_path)
+            if os.path.isfile(target):
+                return FileResponse(target)
+            route_index = os.path.join(static_dir, clean_path, "index.html")
+            if os.path.isfile(route_index):
+                return FileResponse(route_index)
+            root_index = os.path.join(static_dir, "index.html")
+            if os.path.isfile(root_index):
+                return FileResponse(root_index)
+            return FileResponse(os.path.join(static_dir, "404.html"))
+    else:
+        @app.get("/", include_in_schema=False)
+        async def root():
+            return {
+                "name": settings.APP_NAME,
+                "version": settings.APP_VERSION,
+                "docs": "/docs",
+                "redoc": "/redoc",
+                "openapi": "/openapi.json",
+                "health": "/health",
+                "api": settings.API_V1_PREFIX,
+            }
 
     return app
 

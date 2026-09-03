@@ -1,6 +1,16 @@
 # syntax=docker/dockerfile:1
 
-# ---------------------------------------------------------------- build stage
+# -------------------------------------------------------- frontend build stage
+FROM node:20-slim AS frontend-builder
+WORKDIR /app/frontend
+
+COPY frontend/package*.json ./
+RUN npm install --legacy-peer-deps
+
+COPY frontend/ ./
+RUN npm run build
+
+# --------------------------------------------------------- python build stage
 FROM python:3.12-slim AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -19,13 +29,15 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     LITELLM_LOCAL_MODEL_COST_MAP=True \
-    PORT=8080
+    PORT=8080 \
+    STATIC_DIR=/srv/static
 
 RUN addgroup --system app && adduser --system --ingroup app app
 
 WORKDIR /srv
 
 COPY --from=builder /install /usr/local
+COPY --from=frontend-builder /app/frontend/out /srv/static
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini gunicorn.conf.py entrypoint.sh ./

@@ -90,6 +90,12 @@ async def lifespan(app: FastAPI):
         await create_all_tables()
     await _bootstrap_admin()
 
+    # LangGraph durable checkpointing
+    if settings.ORCHESTRATION_ENGINE == "langgraph":
+        from app.engine.checkpointer import init_checkpointer
+
+        await init_checkpointer()
+
     # Warm the Redis pool
     try:
         async with get_redis() as r:
@@ -98,13 +104,19 @@ async def lifespan(app: FastAPI):
     except Exception as exc:  # noqa: BLE001
         logger.warning("redis_unavailable_at_startup", extra={"error": str(exc)[:200]})
 
-    # Background learning worker
+    # Background learning worker.
+    # embedded  -> in-process asyncio poller (legacy single-unit mode)
+    # sidecar   -> arq worker process started by the container entrypoint
+    # external  -> arq worker fleet in separate containers; API does nothing
+    # none      -> no learning execution here
     stop_event = asyncio.Event()
     worker_task: asyncio.Task | None = None
-    if settings.ENABLE_BACKGROUND_WORKERS:
+    if settings.ENABLE_BACKGROUND_WORKERS and settings.WORKER_MODE == "embedded":
         from app.workers.learning import learning_worker_loop
 
         worker_task = asyncio.create_task(learning_worker_loop(stop_event), name="learning-worker")
+    else:
+        logger.info("learning_worker_mode", extra={"mode": settings.WORKER_MODE})
 
     yield
 
@@ -117,6 +129,10 @@ async def lifespan(app: FastAPI):
             worker_task.cancel()
     await close_redis_pool()
     await close_async_engine()
+    if settings.ORCHESTRATION_ENGINE == "langgraph":
+        from app.engine.checkpointer import close_checkpointer
+
+        await close_checkpointer()
     shutdown_executor()
     logger.info("shutdown_complete")
 

@@ -127,6 +127,7 @@ class RunEventType(StrEnum):
     AGENT_THINKING = "agent_thinking"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
+    APPROVAL_REQUIRED = "approval_required"
     REVIEW_VERDICT = "review_verdict"
     MILESTONE_COMPLETE = "milestone_complete"
     STALL_DETECTED = "stall_detected"

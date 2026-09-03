@@ -20,12 +20,12 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import CurrentUser, DBSession, rate_limit
 from app.api.v1.sessions import _get_session_checked
-from app.core.errors import NotFoundError
+from app.core.config import settings
+from app.core.errors import NotFoundError, ValidationFailedError
 from app.core.logging import get_logger
 from app.models import ChatSession, Message, MessageRole, OrchestrationRun, RunStatus, UserRole
 from app.schemas import ChatMessageRequest, RunEventOut, RunOut, StatusResponse
 from app.services.event_bus import EventBus
-from app.services.orchestrator import execute_run
 
 logger = get_logger(__name__)
 
@@ -35,8 +35,20 @@ router = APIRouter(prefix="/chat", tags=["Real-Time Chat & Streaming"], dependen
 _background_runs: set[asyncio.Task] = set()
 
 
+def _run_executor():
+    """Select the orchestration engine entrypoint."""
+    if settings.ORCHESTRATION_ENGINE == "langgraph":
+        from app.engine.runner import execute_langgraph_run
+
+        return execute_langgraph_run
+    from app.services.orchestrator import execute_run
+
+    return execute_run
+
+
 def _launch_run(run_id: uuid.UUID) -> None:
-    task = asyncio.create_task(execute_run(run_id), name=f"run-{run_id}")
+    executor = _run_executor()
+    task = asyncio.create_task(executor(run_id), name=f"run-{run_id}")
     _background_runs.add(task)
     task.add_done_callback(_background_runs.discard)
 
@@ -164,3 +176,62 @@ async def cancel_run(run_id: uuid.UUID, db: DBSession, user: CurrentUser) -> Sta
         await db.flush()
         return StatusResponse(detail="Run marked cancelled (it was not executing on this worker).")
     return StatusResponse(detail=f"Run already terminal ({run.status}).")
+
+
+@router.post(
+    "/runs/{run_id}/resume",
+    response_model=StatusResponse,
+    summary="Resume a run suspended for human approval (HITL)",
+    description=(
+        "Resumes a LangGraph run paused by an `interrupt()` gate — for example when a specialist "
+        "synthesized new sandboxed code that requires operator approval. The graph reloads its "
+        "persisted checkpoint and continues from the exact suspension point.\n\n"
+        "Send `{\"approved\": true}` to allow execution, or `{\"approved\": false}` to reject it."
+    ),
+)
+async def resume_run_endpoint(
+    run_id: uuid.UUID, payload: dict, db: DBSession, user: CurrentUser
+) -> StatusResponse:
+    run = await db.get(OrchestrationRun, run_id)
+    if run is None:
+        raise NotFoundError(f"Run {run_id} not found")
+    await _get_session_checked(db, run.session_id, user)
+    if settings.ORCHESTRATION_ENGINE != "langgraph":
+        raise ValidationFailedError("Run resumption requires the LangGraph engine.")
+
+    from app.engine.runner import resume_run
+
+    async def _resume() -> None:
+        try:
+            await resume_run(run_id, payload)
+        except Exception:  # noqa: BLE001
+            logger.exception("resume_failed", extra={"run_id": str(run_id)})
+
+    task = asyncio.create_task(_resume(), name=f"run-{run_id}")
+    _background_runs.add(task)
+    task.add_done_callback(_background_runs.discard)
+    return StatusResponse(detail="Resume signal accepted; the graph is continuing from its checkpoint.")
+
+
+@router.get(
+    "/runs/{run_id}/checkpoints",
+    summary="Time-travel: list persisted graph checkpoints",
+    description=(
+        "Returns the LangGraph checkpoint history for the run (most recent first): the pending next "
+        "node, step counter and milestone snapshot at each transition. Requires the LangGraph engine "
+        "with checkpointing enabled."
+    ),
+)
+async def run_checkpoints(
+    run_id: uuid.UUID, db: DBSession, user: CurrentUser, limit: int = 20
+) -> list[dict]:
+    run = await db.get(OrchestrationRun, run_id)
+    if run is None:
+        raise NotFoundError(f"Run {run_id} not found")
+    await _get_session_checked(db, run.session_id, user)
+    if settings.ORCHESTRATION_ENGINE != "langgraph":
+        return []
+
+    from app.engine.runner import get_run_state_history
+
+    return await get_run_state_history(run_id, limit=limit)

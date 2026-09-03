@@ -586,9 +586,14 @@ class Orchestrator:
             self.session.total_cost_usd += self.run.cost_usd
             self.session.last_message_at = _utcnow()
 
-            # Queue the ExpeL post-mortem.
+            # Queue the ExpeL post-mortem (row is the source of truth; the ARQ
+            # push is a fast-path hint and may fail without consequence).
             self.db.add(PostMortemJob(run_id=self.run.id, status=PostMortemStatus.QUEUED))
             await self.db.flush()
+            if settings.WORKER_MODE in ("sidecar", "external"):
+                from app.worker import enqueue_post_mortem
+
+                await enqueue_post_mortem(self.run.id)
 
             await self._publish(
                 RunEventType.RUN_COMPLETED,

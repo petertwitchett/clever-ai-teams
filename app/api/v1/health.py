@@ -54,7 +54,26 @@ async def readiness() -> HealthResponse:
         "web_workers": settings.web_workers,
         "cpu_cores": settings.cpu_count,
         "cpu_executor_workers": settings.cpu_executor_workers,
+        "learning_worker_mode": settings.WORKER_MODE,
     }
+
+    try:
+        from app.services.sandbox import resolve_backend
+
+        checks["sandbox"] = {"backend": resolve_backend(), "enabled": settings.SANDBOX_ENABLED}
+    except Exception as exc:  # noqa: BLE001
+        checks["sandbox"] = {"backend": "unavailable", "error": str(exc)[:200]}
+
+    engine_info: dict = {"engine": settings.ORCHESTRATION_ENGINE}
+    if settings.ORCHESTRATION_ENGINE == "langgraph":
+        try:
+            from app.engine.checkpointer import checkpoint_health
+
+            engine_info["checkpointer"] = await checkpoint_health()
+            engine_info["hitl_approval_required"] = settings.HITL_REQUIRE_APPROVAL_FOR_NEW_SKILLS
+        except Exception as exc:  # noqa: BLE001
+            engine_info["checkpointer"] = {"status": "error", "error": str(exc)[:200]}
+    checks["orchestration"] = engine_info
 
     return HealthResponse(
         status=overall,

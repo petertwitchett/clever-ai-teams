@@ -14,8 +14,10 @@ Pipeline per invocation:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.models import Message, MessageRole, PersonNode, RunEventType
+from app.models import AgentSkill, Message, MessageRole, PersonNode, RunEventType, SkillStatus
 from app.services.event_bus import EventBus
 from app.services.llm_gateway import LLMGateway, LLMResponse
 from app.services.memory import MemoryService
@@ -34,6 +36,24 @@ logger = get_logger(__name__)
 
 _MAX_SKILL_ITERATIONS = 4
 _MAX_CONSTITUTION_RETRIES = 2
+
+# An approval gate is an awaitable callback that receives a description of the
+# unverified code about to run and returns True to allow execution.
+#
+# The runtime stays deliberately engine-agnostic: it never imports LangGraph.
+# The LangGraph person node supplies a gate backed by ``interrupt()``, while
+# non-graph callers (REST skill execution, tests) simply pass nothing and the
+# gate defaults to "allow".
+ApprovalGate = Callable[[dict[str, Any]], Awaitable[bool]]
+
+
+def _requires_approval(skill: AgentSkill) -> bool:
+    """True when a skill is unverified and therefore gated by HITL policy."""
+    if not settings.HITL_REQUIRE_APPROVAL_FOR_NEW_SKILLS:
+        return False
+    if skill.is_builtin:
+        return False
+    return skill.status != SkillStatus.VERIFIED
 
 
 @dataclass
@@ -91,6 +111,7 @@ class AgentRuntime:
         event_visibility: str = "agent_debate",
         extra_system: str | None = None,
         record_role: MessageRole = MessageRole.AGENT,
+        approval_gate: ApprovalGate | None = None,
     ) -> AgentInvocationResult:
         """Run the node once against the directive; returns the final artifact."""
         context: AssembledContext = await PersonaAssembler.assemble(
@@ -112,6 +133,7 @@ class AgentRuntime:
         totals.lessons_used = len(context.retrieved_lessons)
         totals.skills_offered = len(context.retrieved_skills)
         allowed_skill_ids = {str(skill.id) for skill in context.retrieved_skills}
+        skills_by_id = {str(skill.id): skill for skill in context.retrieved_skills}
 
         if run_id:
             await EventBus.publish(
@@ -164,6 +186,52 @@ class AgentRuntime:
                     RunEventType.TOOL_CALL,
                     {"node_key": node.node_key, "skill_id": skill_id_raw, "arguments": arguments},
                 )
+
+            # Human-in-the-loop gate: unverified (candidate) code must be approved
+            # before it reaches the sandbox. Under LangGraph the gate raises
+            # ``interrupt()``, which suspends the graph and checkpoints state.
+            candidate = skills_by_id.get(skill_id_raw)
+            if candidate is not None and _requires_approval(candidate) and approval_gate is not None:
+                request = {
+                    "type": "sandbox_approval",
+                    "node_key": node.node_key,
+                    "skill_id": skill_id_raw,
+                    "skill_name": candidate.name,
+                    "status": str(candidate.status),
+                    "arguments": arguments,
+                    "code": candidate.code[:4000],
+                    "code_sha256": hashlib.sha256(candidate.code.encode()).hexdigest(),
+                    "reason": "Approve execution of unverified dynamically synthesized code.",
+                }
+                if run_id:
+                    await EventBus.publish(
+                        run_id,
+                        RunEventType.APPROVAL_REQUIRED,
+                        {k: request[k] for k in ("node_key", "skill_id", "skill_name", "reason")},
+                    )
+                approved = await approval_gate(request)
+                if not approved:
+                    outcome = {
+                        "success": False,
+                        "error": "Execution denied by operator (human-in-the-loop rejection).",
+                        "denied": True,
+                    }
+                    totals.skill_calls.append(
+                        {"skill_id": skill_id_raw, "arguments": arguments, **outcome}
+                    )
+                    messages.append({"role": "assistant", "content": response.content})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "SKILL EXECUTION DENIED: the operator rejected execution of this "
+                                "unverified code. Complete the directive without it, or explain what "
+                                "you cannot determine."
+                            ),
+                        }
+                    )
+                    continue
+
             try:
                 sandbox_result = await SkillService.execute(
                     db, uuid.UUID(skill_id_raw), arguments, node_id=node.id, run_id=run_id

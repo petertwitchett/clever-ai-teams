@@ -99,6 +99,13 @@ class Settings(BaseSettings):
     EMBEDDING_BATCH_SIZE: int = 64
 
     # -------------------------------------------------------- orchestrator ---
+    # langgraph: LangGraph StateGraph runtime with AsyncPostgresSaver checkpoints
+    # native:    the built-in cyclic state machine (fallback / no extra deps)
+    ORCHESTRATION_ENGINE: Literal["langgraph", "native"] = "langgraph"
+    LANGGRAPH_CHECKPOINTS_ENABLED: bool = True
+    LANGGRAPH_CHECKPOINT_POOL_SIZE: int = 2
+    LANGGRAPH_RECURSION_LIMIT: int = 150
+    HITL_REQUIRE_APPROVAL_FOR_NEW_SKILLS: bool = False
     ORCHESTRATOR_STALL_LIMIT: int = 4
     MAX_DIALECTICAL_REVIEW_ITERATIONS: int = 3
     MAX_ORCHESTRATION_STEPS: int = 40
@@ -110,10 +117,14 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------- sandbox ---
     SANDBOX_ENABLED: bool = True
+    SANDBOX_BACKEND: Literal["auto", "docker", "subprocess"] = "auto"
     SANDBOX_TIMEOUT: int = 30
     SANDBOX_MAX_MEMORY_MB: int = 512
     SANDBOX_MAX_OUTPUT_BYTES: int = 65_536
     SANDBOX_ALLOW_NETWORK: bool = False
+    SANDBOX_DOCKER_IMAGE: str = "python:3.12-slim"
+    SANDBOX_DOCKER_SOCKET: str = "/var/run/docker.sock"
+    SANDBOX_DOCKER_CPUS: float = 0.5
 
     # ------------------------------------------------------------- workers ---
     WEB_CONCURRENCY: int | None = None
@@ -121,6 +132,15 @@ class Settings(BaseSettings):
     CPU_EXECUTOR_WORKERS: int | None = None
     BACKGROUND_TASK_WORKERS: int = 2
     ENABLE_BACKGROUND_WORKERS: bool = True
+    # embedded: in-process asyncio poller (single deployment unit)
+    # sidecar:  arq worker process started next to gunicorn in the same container
+    # external: arq worker fleet runs in separate containers ("python -m app.worker")
+    # none:     no learning worker in this process (API-only)
+    WORKER_MODE: Literal["embedded", "sidecar", "external", "none"] = "sidecar"
+    ARQ_QUEUE_NAME: str = "cat:arq:learning"
+    ARQ_MAX_JOBS: int = 4
+    ARQ_JOB_TIMEOUT: int = 300
+    ARQ_POLL_INTERVAL_SECONDS: int = 15
 
     # ------------------------------------------------------------ limiting ---
     RATE_LIMIT_ENABLED: bool = True

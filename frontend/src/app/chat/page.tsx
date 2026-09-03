@@ -22,10 +22,15 @@ import {
   Workflow,
   ChevronRight,
   RefreshCw,
-  Sliders,
-  Play,
+  Trash2,
+  ArrowDown,
   Layers,
-  CheckCircle2,
+  Shield,
+  Code2,
+  TrendingUp,
+  Cpu,
+  CornerDownLeft,
+  XCircle,
 } from "lucide-react";
 
 function ChatContent() {
@@ -40,6 +45,7 @@ function ChatContent() {
   const [inputText, setInputText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [streamingStep, setStreamingStep] = useState<string>("Orchestrator decomposing milestones...");
 
   // Ledgers State
   const [taskLedger, setTaskLedger] = useState<TaskLedger | null>(null);
@@ -47,6 +53,37 @@ function ChatContent() {
   const [critiques, setCritiques] = useState<DialecticalCritique[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  // Quick starter prompt suggestions
+  const quickPrompts = [
+    {
+      title: "Deconstruct Architecture",
+      desc: "Plan sprint milestones & code modules",
+      icon: <Layers className="w-3.5 h-3.5 text-amber-500" />,
+      prompt: "Deconstruct our software architecture into 3 verifiable sprint milestones with clear acceptance criteria.",
+    },
+    {
+      title: "Dialectical Risk Audit",
+      desc: "Stress-test against black swans",
+      icon: <Shield className="w-3.5 h-3.5 text-rose-500" />,
+      prompt: "Run a dialectical stress-test on current system invariants and identify critical single points of failure.",
+    },
+    {
+      title: "AST Python Sandbox",
+      desc: "Generate & execute verified tool",
+      icon: <Code2 className="w-3.5 h-3.5 text-cyan-500" />,
+      prompt: "Generate an AST-validated Python skill to calculate rolling volatility and verify it inside the Voyager sandbox.",
+    },
+    {
+      title: "Quantitative Risk Model",
+      desc: "Asset allocation & downside bounds",
+      icon: <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />,
+      prompt: "Formulate a quantitative risk matrix for autonomous agents with strict capital preservation invariants.",
+    },
+  ];
 
   // Load Graphs and Sessions
   useEffect(() => {
@@ -100,9 +137,31 @@ function ChatContent() {
     loadSessionData();
   }, [currentSession]);
 
-  useEffect(() => {
+  // Scroll to bottom when messages change
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
   }, [messages, isStreaming]);
+
+  // Handle scroll detection for "Scroll to bottom" button
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 120;
+    setShowScrollBottom(!isAtBottom);
+  };
+
+  // Auto-resize textarea
+  const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputText(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+    }
+  };
 
   // Create New Session
   const handleNewSession = async () => {
@@ -116,6 +175,9 @@ function ChatContent() {
       setTaskLedger(null);
       setProgressLedger(null);
       setCritiques([]);
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
     } catch (err) {
       console.error("Create session error:", err);
     }
@@ -146,7 +208,11 @@ function ChatContent() {
 
     setMessages((prev) => [...prev, clientMsg]);
     setInputText("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
     setIsStreaming(true);
+    setStreamingStep("Orchestrator decomposing milestones into Task Ledger...");
 
     try {
       const { run_id } = await api.sendMessage(sessionId, text);
@@ -156,9 +222,11 @@ function ChatContent() {
         onLedgerUpdate: (tl, pl) => {
           setTaskLedger(tl);
           setProgressLedger(pl);
+          setStreamingStep("Specialists dispatching inner progress loop...");
         },
         onAgentDebate: (crit) => {
           setCritiques((prev) => [...prev, crit]);
+          setStreamingStep("Dialectical Critic verifying constitutional invariants...");
         },
         onFinalChunk: () => {},
         onComplete: async () => {
@@ -184,30 +252,40 @@ function ChatContent() {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   const activeGraph = graphs.find((g) => g.id === selectedGraphId) || graphs[0];
 
   return (
-    <div className="flex h-[calc(100vh-140px)] rounded-2xl border border-surface-border overflow-hidden bg-surface-card shadow-mat">
+    <div className="flex h-[calc(100vh-130px)] rounded-2xl border border-surface-border overflow-hidden bg-surface-card shadow-mat">
       {/* 1. Left Sidebar: Chat Sessions History */}
-      <div className="w-64 border-r border-surface-border flex flex-col bg-surface-hover/30 shrink-0 hidden md:flex">
+      <div className="w-68 border-r border-surface-border flex flex-col bg-surface-hover/20 shrink-0 hidden md:flex">
+        {/* New Session Header Button */}
         <div className="p-3.5 border-b border-surface-border">
           <button
             onClick={handleNewSession}
-            className="w-full mat-btn mat-btn-primary text-xs font-semibold py-2 flex items-center justify-center gap-1.5"
+            className="w-full mat-btn mat-btn-primary text-xs font-semibold py-2.5 flex items-center justify-center gap-2 shadow-mat-glow"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Session</span>
+            <Plus className="w-4 h-4" />
+            <span>New Deliberation Session</span>
           </button>
         </div>
 
-        <div className="p-2 border-b border-surface-border">
-          <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider block px-2 mb-1">
-            Active Team Graph
+        {/* Team Selector */}
+        <div className="p-3 border-b border-surface-border">
+          <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider block px-1 mb-1.5 flex items-center gap-1">
+            <Cpu className="w-3 h-3 text-primary" />
+            <span>Active Team Graph</span>
           </label>
           <select
             value={selectedGraphId}
             onChange={(e) => setSelectedGraphId(e.target.value)}
-            className="mat-input text-xs py-1 px-2 font-medium"
+            className="mat-input text-xs py-1.5 px-2.5 font-medium w-full"
           >
             {graphs.map((g) => (
               <option key={g.id} value={g.id}>
@@ -218,25 +296,34 @@ function ChatContent() {
         </div>
 
         {/* Sessions List */}
-        <div className="flex-1 p-2 overflow-y-auto space-y-1 text-xs">
-          <span className="text-[10px] font-bold text-content-subtle uppercase tracking-wider block px-2 py-1">
-            Recent Sessions ({sessions.length})
-          </span>
+        <div className="flex-1 p-2.5 overflow-y-auto space-y-1.5 text-xs">
+          <div className="flex items-center justify-between px-2 py-1 text-[10px] font-bold text-content-subtle uppercase tracking-wider">
+            <span>Sessions History</span>
+            <span className="px-1.5 py-0.2 rounded bg-surface-hover font-mono">
+              {sessions.length}
+            </span>
+          </div>
+
           {sessions.map((s) => {
             const isSelected = currentSession?.id === s.id;
             return (
               <button
                 key={s.id}
                 onClick={() => setCurrentSession(s)}
-                className={`w-full text-left p-2.5 rounded-xl transition-all block truncate ${
+                className={`w-full text-left p-3 rounded-xl transition-all block group relative ${
                   isSelected
-                    ? "bg-primary/10 text-primary font-bold shadow-xs border border-primary/20"
-                    : "text-content-main hover:bg-surface-hover font-medium"
+                    ? "bg-primary/15 text-primary font-bold shadow-xs border border-primary/30"
+                    : "text-content-main hover:bg-surface-hover font-medium border border-transparent"
                 }`}
               >
-                <span className="truncate block">{s.title}</span>
-                <span className="text-[10px] text-content-muted block mt-0.5">
-                  {new Date(s.created_at).toLocaleDateString()}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="truncate block flex-1">{s.title}</span>
+                  {isSelected && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                  )}
+                </div>
+                <span className="text-[10px] text-content-muted block mt-1 font-mono">
+                  {new Date(s.created_at).toLocaleDateString()} • {new Date(s.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </button>
             );
@@ -244,24 +331,26 @@ function ChatContent() {
         </div>
       </div>
 
-      {/* 2. Middle Panel: Conversation Message Stream */}
-      <div className="flex-1 flex flex-col min-w-0 bg-surface-bg/50">
+      {/* 2. Middle Panel: Conversation Message Stream & Composer */}
+      <div className="flex-1 flex flex-col min-w-0 bg-surface-bg/40 relative">
         {/* Chat Header */}
-        <div className="p-3.5 px-5 border-b border-surface-border flex items-center justify-between bg-surface-card">
+        <div className="p-3.5 px-6 border-b border-surface-border flex items-center justify-between bg-surface-card/90 backdrop-blur-md z-10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary/20 to-amber-500/20 text-primary flex items-center justify-center font-bold shadow-xs border border-primary/20">
               <Bot className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-bold text-sm text-content-main leading-tight flex items-center gap-2">
                 {activeGraph?.name || "Clever AI Team"}
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Magentic-One
+                  Magentic-One Dual-Ledger
                 </span>
               </h3>
-              <p className="text-[11px] text-content-muted">
-                {activeGraph?.node_count || 4} Specialists • Outer Task Loop + Inner Progress Loop
+              <p className="text-[11px] text-content-muted mt-0.5 flex items-center gap-2">
+                <span>{activeGraph?.node_count || 4} Specialists bound</span>
+                <span>•</span>
+                <span className="font-mono text-content-subtle">Checkpointer: PostgreSQL</span>
               </p>
             </div>
           </div>
@@ -269,9 +358,9 @@ function ChatContent() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setDrawerOpen((prev) => !prev)}
-              className={`mat-btn text-xs px-3 py-1.5 flex items-center gap-1.5 ${
+              className={`mat-btn text-xs px-3.5 py-2 flex items-center gap-2 transition-all ${
                 drawerOpen
-                  ? "bg-primary/10 text-primary font-bold border border-primary/30"
+                  ? "bg-primary/15 text-primary font-bold border border-primary/30 shadow-mat-glow"
                   : "mat-btn-outline"
               }`}
             >
@@ -281,80 +370,188 @@ function ChatContent() {
           </div>
         </div>
 
-        {/* Message Stream */}
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4 max-w-md mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary/20 to-amber-500/20 text-primary flex items-center justify-center shadow-mat-glow animate-float-slow">
-                <Bot className="w-8 h-8" />
-              </div>
-              <div>
-                <h4 className="font-bold text-base text-content-main">
-                  AI Collective Ready for Directives
-                </h4>
-                <p className="text-xs text-content-muted mt-1 leading-relaxed">
-                  Submit a goal or research objective. The Magentic Orchestrator will construct a
-                  Task Ledger and dispatch subtasks to specialists.
-                </p>
-              </div>
+        {/* Message Stream Scroll Area */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-4 md:px-8 py-6 relative"
+        >
+          {/* Centered Constrained Column for Optimal Reading Ergonomics */}
+          <div className="max-w-4xl mx-auto w-full space-y-4 pb-2">
+            {messages.length === 0 ? (
+              /* Hero Empty State */
+              <div className="py-8 flex flex-col items-center justify-center text-center space-y-6">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-primary/20 via-amber-500/15 to-primary/10 text-primary flex items-center justify-center shadow-mat-glow animate-float-slow border border-primary/30">
+                  <Bot className="w-10 h-10" />
+                </div>
+                <div className="max-w-lg space-y-2">
+                  <h4 className="font-bold text-lg text-content-main">
+                    Autonomous Multi-Agent Collective Ready
+                  </h4>
+                  <p className="text-xs text-content-muted leading-relaxed">
+                    Issue complex goals to your agent team. The Magentic Orchestrator will construct a
+                    structured Task Ledger, dispatch subtasks to specialists, and enforce constitutional invariants.
+                  </p>
+                </div>
 
-              {/* Quick Prompts */}
-              <div className="w-full space-y-2 pt-2 text-xs">
-                {[
-                  "Evaluate inference cost economics: DeepSeek-R1 vs commercial frontiers",
-                  "Formulate a quantitative risk matrix for autonomous code execution",
-                  "Cross-examine market growth assumptions for Q3 2026 AI platforms",
-                ].map((prompt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSendMessage(prompt)}
-                    className="w-full text-left p-2.5 rounded-xl border border-surface-border bg-surface-card hover:border-primary/50 text-content-main transition-all font-medium flex items-center justify-between group"
-                  >
-                    <span className="truncate">{prompt}</span>
-                    <ChevronRight className="w-3.5 h-3.5 text-content-muted group-hover:text-primary transition-colors" />
-                  </button>
-                ))}
+                {/* Quick Prompts 2x2 Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl pt-2 text-left">
+                  {quickPrompts.map((item, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSendMessage(item.prompt)}
+                      className="p-3.5 rounded-2xl border border-surface-border bg-surface-card hover:border-primary/50 hover:shadow-mat-hover text-content-main transition-all group flex items-start gap-3"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-surface-hover flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        {item.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-xs text-content-main flex items-center justify-between">
+                          <span>{item.title}</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-content-muted group-hover:text-primary transition-colors" />
+                        </div>
+                        <p className="text-[11px] text-content-muted truncate mt-0.5">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            messages.map((m) => <MessageBubble key={m.id} message={m} />)
+            ) : (
+              /* Render Real Live Messages */
+              messages.map((m) => <MessageBubble key={m.id} message={m} />)
+            )}
+
+            {/* Deliberation Streaming Indicator */}
+            {isStreaming && (
+              <div className="max-w-3xl rounded-2xl p-4 bg-gradient-to-r from-primary/10 via-amber-500/5 to-surface-card border border-primary/30 text-xs shadow-mat-glow my-4 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-primary/20 text-primary flex items-center justify-center shrink-0">
+                    <RefreshCw className="w-4 h-4 animate-spin text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h5 className="font-bold text-xs text-content-main flex items-center gap-2">
+                      <span>Autonomous Collective Active</span>
+                      <span className="text-[10px] px-2 py-0.2 rounded-full bg-primary/20 text-primary font-mono">
+                        Dual-Ledger Loop
+                      </span>
+                    </h5>
+                    <p className="text-[11px] text-content-muted mt-0.5 truncate font-mono">
+                      {streamingStep}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Floating Scroll to Bottom Button */}
+          {showScrollBottom && (
+            <button
+              onClick={scrollToBottom}
+              className="absolute bottom-4 right-8 p-2.5 rounded-full bg-surface-card border border-surface-border text-primary shadow-mat-hover hover:scale-110 transition-all z-20 flex items-center gap-1.5 text-xs font-semibold"
+            >
+              <ArrowDown className="w-4 h-4" />
+              <span>Jump to bottom</span>
+            </button>
           )}
-
-          {isStreaming && (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-card border border-surface-border text-xs text-content-muted animate-pulse">
-              <RefreshCw className="w-4 h-4 animate-spin text-primary" />
-              <span>Orchestrator decomposing milestones and auditing peer debate...</span>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Bar */}
-        <div className="p-3.5 px-4 bg-surface-card border-t border-surface-border">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            className="flex items-center gap-2"
-          >
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Instruct the AI team (e.g. 'Analyze market competitors and verify claims')..."
-              disabled={isStreaming}
-              className="flex-1 mat-input text-xs py-2.5 px-3.5"
-            />
-            <button
-              type="submit"
-              disabled={!inputText.trim() || isStreaming}
-              className="mat-btn mat-btn-primary px-4 py-2.5 text-xs font-semibold disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+        {/* 3. Floating State-of-the-Art Composer (Input Box) */}
+        <div className="p-3 md:p-4 bg-gradient-to-t from-surface-bg via-surface-bg/95 to-transparent z-10">
+          <div className="max-w-4xl mx-auto w-full space-y-2.5">
+            {/* Quick Prompt Suggestion Pills (Horizontal Scrollable Carousel) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+              <span className="text-[10px] font-bold text-content-subtle uppercase tracking-wider shrink-0 flex items-center gap-1 px-1">
+                <Sparkles className="w-3 h-3 text-primary" />
+                <span>Suggestions:</span>
+              </span>
+              {quickPrompts.map((item, i) => (
+                <button
+                  key={i}
+                  onClick={() => setInputText(item.prompt)}
+                  className="px-3 py-1.5 rounded-full border border-surface-border bg-surface-card/90 hover:border-primary/50 text-content-muted hover:text-content-main hover:bg-surface-hover text-xs font-medium shrink-0 transition-all flex items-center gap-1.5 shadow-2xs"
+                >
+                  {item.icon}
+                  <span>{item.title}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Composer Capsule Card */}
+            <div className="rounded-2xl border border-surface-border bg-surface-card/95 backdrop-blur-lg shadow-mat p-3 transition-all focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 focus-within:shadow-mat-glow">
+              {/* Composer Header Pill */}
+              <div className="flex items-center justify-between pb-2 mb-1.5 border-b border-surface-border/60 text-[11px] text-content-subtle px-1">
+                <div className="flex items-center gap-2 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-content-muted">Target Collective:</span>
+                  <span className="font-bold text-content-main truncate max-w-[260px]">
+                    {activeGraph?.name || "Clever AI Team"}
+                  </span>
+                </div>
+
+                <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono text-content-subtle">
+                  <span>Enter ↵ to send</span>
+                  <span>•</span>
+                  <span>Shift + Enter for newline</span>
+                </div>
+              </div>
+
+              {/* Textarea */}
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={inputText}
+                onChange={handleTextareaInput}
+                onKeyDown={handleKeyDown}
+                placeholder="Instruct the autonomous agent collective (e.g. 'Audit this architecture against security invariants and draft execution milestones')..."
+                disabled={isStreaming}
+                className="w-full bg-transparent text-xs sm:text-sm text-content-main placeholder:text-content-subtle resize-none focus:outline-hidden leading-relaxed px-1 py-1 max-h-[180px] min-h-[44px]"
+              />
+
+              {/* Composer Footer Actions & Send Button */}
+              <div className="flex items-center justify-between pt-2 border-t border-surface-border/60 mt-1">
+                <div className="flex items-center gap-1.5">
+                  {inputText.trim().length > 0 && (
+                    <button
+                      onClick={() => setInputText("")}
+                      className="p-1.5 rounded-lg hover:bg-surface-hover text-content-muted hover:text-content-main transition-colors text-[11px] flex items-center gap-1"
+                      title="Clear prompt"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Clear</span>
+                    </button>
+                  )}
+                  <span className="text-[10px] font-mono text-content-subtle px-2">
+                    {inputText.length > 0 ? `${inputText.length} chars` : "Ready"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSendMessage()}
+                    disabled={!inputText.trim() || isStreaming}
+                    className="mat-btn mat-btn-primary px-4 py-2 text-xs font-semibold flex items-center gap-2 rounded-xl shadow-mat-glow disabled:opacity-40 disabled:cursor-not-allowed hover:scale-102 active:scale-98 transition-all"
+                  >
+                    {isStreaming ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Deliberating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send Directive</span>
+                        <Send className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

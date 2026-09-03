@@ -109,8 +109,8 @@ export default function RegisterPage() {
           {/* Full Name */}
           <div className="space-y-1.5">
             <label className="font-semibold text-content-main block">Full Name</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-content-muted">
+            <div className="relative flex items-center">
+              <div className="absolute left-3.5 flex items-center pointer-events-none text-content-muted z-10">
                 <User className="w-4 h-4" />
               </div>
               <input
@@ -119,7 +119,7 @@ export default function RegisterPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Sofia Sterling"
-                className="mat-input w-full pl-10 pr-3.5 py-2.5 text-xs font-medium"
+                className="mat-input mat-input-icon-left w-full !pl-11 pr-3.5 py-2.5 text-xs font-medium"
               />
             </div>
           </div>
@@ -127,8 +127,8 @@ export default function RegisterPage() {
           {/* Email */}
           <div className="space-y-1.5">
             <label className="font-semibold text-content-main block">Email Address</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-content-muted">
+            <div className="relative flex items-center">
+              <div className="absolute left-3.5 flex items-center pointer-events-none text-content-muted z-10">
                 <Mail className="w-4 h-4" />
               </div>
               <input
@@ -137,7 +137,7 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="sofia@clever.ai"
-                className="mat-input w-full pl-10 pr-3.5 py-2.5 text-xs font-medium"
+                className="mat-input mat-input-icon-left w-full !pl-11 pr-3.5 py-2.5 text-xs font-medium"
               />
             </div>
           </div>
@@ -145,8 +145,8 @@ export default function RegisterPage() {
           {/* Password */}
           <div className="space-y-1.5">
             <label className="font-semibold text-content-main block">Password (min. 8 characters)</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-content-muted">
+            <div className="relative flex items-center">
+              <div className="absolute left-3.5 flex items-center pointer-events-none text-content-muted z-10">
                 <Lock className="w-4 h-4" />
               </div>
               <input
@@ -155,12 +155,12 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="mat-input w-full pl-10 pr-10 py-2.5 text-xs font-medium"
+                className="mat-input mat-input-icon-left mat-input-icon-right w-full !pl-11 !pr-11 py-2.5 text-xs font-medium"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-content-muted hover:text-content-main"
+                className="absolute right-3.5 flex items-center text-content-muted hover:text-content-main z-10"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -170,8 +170,8 @@ export default function RegisterPage() {
           {/* Confirm Password */}
           <div className="space-y-1.5">
             <label className="font-semibold text-content-main block">Confirm Password</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-content-muted">
+            <div className="relative flex items-center">
+              <div className="absolute left-3.5 flex items-center pointer-events-none text-content-muted z-10">
                 <Lock className="w-4 h-4" />
               </div>
               <input
@@ -180,7 +180,7 @@ export default function RegisterPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="mat-input w-full pl-10 pr-3.5 py-2.5 text-xs font-medium"
+                className="mat-input mat-input-icon-left w-full !pl-11 pr-3.5 py-2.5 text-xs font-medium"
               />
             </div>
           </div>

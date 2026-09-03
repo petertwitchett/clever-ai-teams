@@ -42,6 +42,9 @@ const config: Config = {
           lightCard: "#FFFFFF",
         },
       },
+      spacing: {
+        "4.5": "1.125rem",
+      },
       borderRadius: {
         mat: "0.5rem",
         "mat-lg": "0.75rem",

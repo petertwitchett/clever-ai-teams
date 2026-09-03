@@ -52,13 +52,13 @@ export function Navbar() {
         {/* Search Bar with CTRL + K */}
         <div className="flex-1 max-w-md">
           <div className="relative flex items-center">
-            <Search className="absolute left-3 w-4 h-4 text-content-subtle pointer-events-none" />
+            <Search className="absolute left-3.5 w-4 h-4 text-content-subtle pointer-events-none z-10" />
             <input
               type="text"
               placeholder="Search (CTRL + K)..."
-              className="mat-input pl-9 pr-12 text-xs py-2 w-full"
+              className="mat-input mat-input-icon-left mat-input-icon-right !pl-10 !pr-16 text-xs py-2 w-full font-medium"
             />
-            <kbd className="absolute right-3 px-1.5 py-0.5 rounded text-[10px] font-mono bg-surface-hover text-content-subtle border border-surface-border">
+            <kbd className="absolute right-3 px-1.5 py-0.5 rounded text-[10px] font-mono bg-surface-hover text-content-subtle border border-surface-border pointer-events-none z-10">
               CTRL K
             </kbd>
           </div>

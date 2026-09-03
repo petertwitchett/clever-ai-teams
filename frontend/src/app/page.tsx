@@ -176,7 +176,7 @@ export default function DashboardPage() {
         {/* Card 1: Active Graphs */}
         <Link
           href="/canvas"
-          className="mat-card p-5 hover:border-primary/50 hover:shadow-mat-hover transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
+          className="mat-card p-6 hover:border-primary/50 hover:shadow-mat-hover transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
         >
           <div className="flex items-start justify-between">
             <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold shadow-xs group-hover:scale-105 transition-transform">
@@ -216,7 +216,7 @@ export default function DashboardPage() {
         {/* Card 2: Voyager Dynamic Skills */}
         <Link
           href="/skills"
-          className="mat-card p-5 hover:border-amber-500/50 hover:shadow-mat-hover transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
+          className="mat-card p-6 hover:border-amber-500/50 hover:shadow-mat-hover transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
         >
           <div className="flex items-start justify-between">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold shadow-xs group-hover:scale-105 transition-transform">
@@ -256,7 +256,7 @@ export default function DashboardPage() {
         {/* Card 3: Chat Deliberations */}
         <Link
           href="/chat"
-          className="mat-card p-5 hover:border-emerald-500/50 hover:shadow-mat-hover transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
+          className="mat-card p-6 hover:border-emerald-500/50 hover:shadow-mat-hover transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
         >
           <div className="flex items-start justify-between">
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold shadow-xs group-hover:scale-105 transition-transform">
@@ -296,7 +296,7 @@ export default function DashboardPage() {
         {/* Card 4: Person Nodes */}
         <Link
           href="/personas"
-          className="mat-card p-5 hover:border-cyan-500/50 hover:shadow-mat-hover transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
+          className="mat-card p-6 hover:border-cyan-500/50 hover:shadow-mat-hover transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
         >
           <div className="flex items-start justify-between">
             <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center font-bold shadow-xs group-hover:scale-105 transition-transform">

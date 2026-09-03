@@ -84,7 +84,7 @@ export default function SkillsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="mat-card p-5 flex flex-wrap items-center justify-between gap-4">
+      <div className="mat-card p-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="font-bold text-lg text-content-main flex items-center gap-2">
             <Cpu className="w-5 h-5 text-amber-500" />
@@ -126,7 +126,7 @@ export default function SkillsPage() {
       {activeTab === "voyager" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Skills List (Left 4 cols) */}
-          <div className="lg:col-span-4 mat-card p-4 space-y-2">
+          <div className="lg:col-span-4 mat-card p-5 space-y-2">
             <span className="text-[11px] font-bold text-content-muted uppercase tracking-wider block px-2 mb-2">
               Vector Skill Library ({skills.length})
             </span>
@@ -139,28 +139,36 @@ export default function SkillsPage() {
                     setSelectedSkill(skill);
                     setSandboxOutput(null);
                   }}
-                  className={`w-full text-left p-3 rounded-xl border transition-all block ${
+                  className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${
                     isSelected
-                      ? "bg-primary/10 border-primary text-content-main font-bold shadow-xs"
-                      : "bg-surface-hover/30 border-surface-border text-content-main hover:border-primary/40 font-medium"
+                      ? "border-amber-500 bg-amber-500/10 shadow-xs"
+                      : "border-surface-border hover:border-surface-border/80 hover:bg-surface-hover/50"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs truncate block">{skill.name}</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-semibold uppercase">
-                      AST Valid
-                    </span>
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                      isSelected
+                        ? "bg-amber-500 text-white"
+                        : "bg-surface-hover text-content-muted"
+                    }`}
+                  >
+                    <Terminal className="w-4 h-4" />
                   </div>
-                  <span className="text-[10px] text-content-muted block mt-1">
-                    {skill.category} • {skill.success_rate}% Success
-                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs text-content-main truncate">
+                      {skill.name}
+                    </p>
+                    <p className="text-[11px] text-content-muted line-clamp-1 mt-0.5">
+                      {skill.description}
+                    </p>
+                  </div>
                 </button>
               );
             })}
           </div>
 
-          {/* Code Viewer & Sandbox Runner (Right 8 cols) */}
-          <div className="lg:col-span-8 mat-card p-5 space-y-4">
+          {/* Sandbox Detail & Runner (Right 8 cols) */}
+          <div className="lg:col-span-8 mat-card p-6 space-y-5">
             {selectedSkill ? (
               <>
                 <div className="flex items-start justify-between pb-3 border-b border-surface-border">
@@ -261,7 +269,7 @@ export default function SkillsPage() {
       {/* TRACK 2: EXPEL REFLECTION LESSONS */}
       {activeTab === "expel" && (
         <div className="space-y-4">
-          <div className="mat-card p-5 flex items-center justify-between">
+          <div className="mat-card p-6 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h3 className="font-bold text-base text-content-main">
                 Experiential Reflection Heuristics
@@ -282,11 +290,11 @@ export default function SkillsPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {reflections.map((r) => (
               <div
                 key={r.id}
-                className="mat-card p-5 flex flex-col justify-between border-l-4 border-l-amber-500 hover:shadow-mat-hover transition-all"
+                className="mat-card p-6 flex flex-col justify-between border-l-4 border-l-amber-500 hover:shadow-mat-hover transition-all"
               >
                 <div>
                   <div className="flex items-center justify-between text-[10px] text-content-muted mb-2 font-mono">

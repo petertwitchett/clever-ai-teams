@@ -59,7 +59,7 @@ export default function PersonasPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="mat-card p-5 flex items-center justify-between">
+      <div className="mat-card p-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="font-bold text-lg text-content-main flex items-center gap-2">
             <Brain className="w-5 h-5 text-primary" />
@@ -109,7 +109,7 @@ export default function PersonasPage() {
             setPersonas([...personas, newPersona]);
             handleEdit(newPersona);
           }}
-          className="mat-btn mat-btn-primary text-xs font-semibold px-4 py-2 flex items-center gap-1.5"
+          className="mat-btn mat-btn-primary text-xs font-semibold px-4 py-2.5 flex items-center gap-1.5 shadow-mat-glow"
         >
           <Plus className="w-4 h-4" />
           <span>New Person Node</span>
@@ -121,7 +121,7 @@ export default function PersonasPage() {
         {personas.map((p) => (
           <div
             key={p.identity.id}
-            className="mat-card p-5 flex flex-col justify-between hover:border-primary/50 transition-all group"
+            className="mat-card p-6 flex flex-col justify-between hover:border-primary/50 hover:shadow-mat-hover transition-all group"
           >
             <div>
               {/* Header */}

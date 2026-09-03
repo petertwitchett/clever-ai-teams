@@ -44,7 +44,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
-      <div className="mat-card p-5 flex items-center justify-between">
+      <div className="mat-card p-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="font-bold text-lg text-content-main flex items-center gap-2">
             <Settings className="w-5 h-5 text-primary" />
@@ -59,7 +59,7 @@ export default function SettingsPage() {
           href="https://app-912ec933-b93b-4612-b0f3-89d1351070b9.cleverapps.io/docs"
           target="_blank"
           rel="noreferrer"
-          className="mat-btn mat-btn-primary text-xs font-semibold px-4 py-2 flex items-center gap-1.5"
+          className="mat-btn mat-btn-primary text-xs font-semibold px-4 py-2.5 flex items-center gap-1.5 shadow-mat-glow"
         >
           <ExternalLink className="w-3.5 h-3.5" />
           <span>Interactive Swagger UI (/docs)</span>
@@ -69,7 +69,7 @@ export default function SettingsPage() {
       {/* Grid: Infrastructure Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: Multi-Core Uvicorn */}
-        <div className="mat-card p-5 space-y-3">
+        <div className="mat-card p-6 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
               <Cpu className="w-5 h-5" />
@@ -98,38 +98,36 @@ export default function SettingsPage() {
         </div>
 
         {/* Card 2: PostgreSQL & pgvector */}
-        <div className="mat-card p-5 space-y-3">
+        <div className="mat-card p-6 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-content-main">PostgreSQL 16</h3>
+              <h3 className="font-bold text-sm text-content-main">PostgreSQL Checkpointer</h3>
               <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> pgvector 0.8.5 Active
+                <CheckCircle2 className="w-3 h-3" /> Schema: clever_ai
               </span>
             </div>
           </div>
           <div className="text-xs text-content-muted space-y-1.5 pt-2 border-t border-surface-border">
             <div className="flex justify-between">
-              <span>Schema Isolation:</span>
-              <strong className="text-content-main font-mono">clever_ai</strong>
+              <span>Connection Pool:</span>
+              <strong className="text-content-main">Asyncpg (SQLAlchemy 2.0)</strong>
             </div>
             <div className="flex justify-between">
-              <span>Vector Indexes:</span>
-              <strong className="text-content-main">HNSW (Cosine)</strong>
+              <span>Vector Dimension:</span>
+              <strong className="text-content-main">1536 (OpenAI Embeddings)</strong>
             </div>
             <div className="flex justify-between">
-              <span>Database URL:</span>
-              <strong className="text-content-main truncate max-w-[120px]">
-                Clever Cloud PG
-              </strong>
+              <span>Index Type:</span>
+              <strong className="text-primary font-mono">HNSW Cosine Ops</strong>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Redis High-Speed Cache */}
-        <div className="mat-card p-5 space-y-3">
+        {/* Card 3: ARQ Distributed Queue */}
+        <div className="mat-card p-6 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold">
               <Zap className="w-5 h-5" />

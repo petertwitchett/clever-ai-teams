@@ -39,7 +39,7 @@ export default function MemoryPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="mat-card p-5 flex flex-wrap items-center justify-between gap-4">
+      <div className="mat-card p-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="font-bold text-lg text-content-main flex items-center gap-2">
             <Database className="w-5 h-5 text-primary" />
@@ -53,22 +53,22 @@ export default function MemoryPage() {
       </div>
 
       {/* Semantic Search Input */}
-      <div className="mat-card p-4">
+      <div className="mat-card p-5">
         <form onSubmit={handleSearch} className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-subtle" />
+          <div className="relative flex-1 flex items-center">
+            <Search className="absolute left-3.5 w-4 h-4 text-content-subtle pointer-events-none z-10" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search agent archival memories via pgvector cosine similarity..."
-              className="mat-input pl-10 text-xs py-2.5"
+              className="mat-input mat-input-icon-left !pl-11 text-xs py-2.5 w-full font-medium"
             />
           </div>
           <button
             type="submit"
             disabled={isSearching}
-            className="mat-btn mat-btn-primary px-5 py-2.5 text-xs font-semibold"
+            className="mat-btn mat-btn-primary px-5 py-2.5 text-xs font-semibold shadow-mat-glow"
           >
             {isSearching ? "Searching Vectors..." : "Similarity Search"}
           </button>
@@ -80,7 +80,7 @@ export default function MemoryPage() {
         {memories.map((mem) => (
           <div
             key={mem.id}
-            className="mat-card p-5 flex flex-col justify-between hover:border-primary/50 transition-all"
+            className="mat-card p-6 flex flex-col justify-between hover:border-primary/50 hover:shadow-mat-hover transition-all"
           >
             <div>
               <div className="flex items-center justify-between pb-2 mb-3 border-b border-surface-border">

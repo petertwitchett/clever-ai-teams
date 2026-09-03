@@ -3,9 +3,14 @@
 .mat-card {
   background-color: var(--surface-card);
   border: 1px solid var(--surface-border);
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   box-shadow: var(--card-shadow);
+  padding: 1.5rem; /* Generous 24px default padding */
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  @media (max-width: 640px) {
+    padding: 1.125rem; /* 18px on mobile */
+  }
 
   &:hover {
     box-shadow: 0 6px 22px 0 rgba(47, 43, 61, 0.12);
@@ -146,6 +151,31 @@
   font-size: 0.875rem;
   transition: all 0.15s ease;
 
+  /* Explicit icon padding overrides */
+  &.has-icon-left,
+  &.mat-input-icon-left,
+  &.pl-9,
+  &.\!pl-9,
+  &.pl-10,
+  &.\!pl-10,
+  &.pl-11,
+  &.\!pl-11,
+  &.pl-12,
+  &.\!pl-12 {
+    padding-left: 2.65rem !important;
+  }
+
+  &.has-icon-right,
+  &.mat-input-icon-right,
+  &.pr-10,
+  &.\!pr-10,
+  &.pr-12,
+  &.\!pr-12,
+  &.pr-16,
+  &.\!pr-16 {
+    padding-right: 2.75rem !important;
+  }
+
   &::placeholder {
     color: var(--text-subtle);
   }
@@ -156,3 +186,4 @@
     box-shadow: 0 0 0 3px rgba(var(--color-primary), 0.18);
   }
 }
+

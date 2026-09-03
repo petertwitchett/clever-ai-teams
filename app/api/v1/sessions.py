@@ -51,24 +51,76 @@ async def create_session(payload: SessionCreate, db: DBSession, user: CurrentUse
     return session
 
 
-@router.get("", response_model=Page[SessionOut], summary="List my sessions")
+@router.get(
+    "",
+    response_model=Page[SessionOut],
+    summary="List my sessions (optionally scoped to one canvas)",
+    description=(
+        "Paginated conversation history for the caller. Pass `graph_id` to list only the "
+        "conversations belonging to one canvas/team, which is what a canvas-scoped chat sidebar "
+        "needs. Each item includes `graph_name`, `message_count` and `run_count` so the sidebar "
+        "renders from a single request.\n\n"
+        "Use `search` to match session titles."
+    ),
+)
 async def list_sessions(
     db: DBSession,
     user: CurrentUser,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     status_filter: SessionStatus | None = Query(default=None, alias="status"),
+    graph_id: uuid.UUID | None = Query(default=None, description="Only sessions bound to this graph"),
+    search: str | None = Query(default=None, max_length=128, description="Free-text match on session title"),
 ) -> Page[SessionOut]:
-    base = select(ChatSession).where(ChatSession.user_id == user.id)
+    message_count = (
+        select(func.count(Message.id))
+        .where(Message.session_id == ChatSession.id)
+        .correlate(ChatSession)
+        .scalar_subquery()
+    )
+    run_count = (
+        select(func.count(OrchestrationRun.id))
+        .where(OrchestrationRun.session_id == ChatSession.id)
+        .correlate(ChatSession)
+        .scalar_subquery()
+    )
+
+    base = (
+        select(
+            ChatSession,
+            AgentGraph.name.label("graph_name"),
+            AgentGraph.status.label("graph_status"),
+            message_count.label("message_count"),
+            run_count.label("run_count"),
+        )
+        .join(AgentGraph, AgentGraph.id == ChatSession.graph_id)
+        .where(ChatSession.user_id == user.id)
+    )
+
     if status_filter:
         base = base.where(ChatSession.status == status_filter)
+    if graph_id is not None:
+        base = base.where(ChatSession.graph_id == graph_id)
+    if search:
+        base = base.where(ChatSession.title.ilike(f"%{search.strip()}%"))
+
     total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
     rows = (
-        (await db.execute(base.order_by(ChatSession.last_message_at.desc().nulls_last()).limit(limit).offset(offset)))
-        .scalars()
-        .all()
-    )
-    return Page(items=[SessionOut.model_validate(s) for s in rows], total=total, limit=limit, offset=offset)
+        await db.execute(
+            base.order_by(ChatSession.last_message_at.desc().nulls_last()).limit(limit).offset(offset)
+        )
+    ).all()
+
+    items = []
+    for session, graph_name, graph_status, msg_count, r_count in rows:
+        item = SessionOut.model_validate(session)
+        item.graph_name = graph_name
+        item.graph_status = str(graph_status) if graph_status is not None else None
+        item.message_count = msg_count or 0
+        item.run_count = r_count or 0
+        items.append(item)
+
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/{session_id}", response_model=SessionOut, summary="Get a session")

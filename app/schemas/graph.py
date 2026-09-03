@@ -99,7 +99,11 @@ class GraphEdgeOut(APIModel):
 
 
 class GraphOut(APIModel):
-    """Graph summary representation."""
+    """Graph summary representation.
+
+    The ``*_count`` fields let a canvas library render cards for many graphs from
+    a single list call, instead of fetching every graph's detail (N+1).
+    """
 
     id: uuid.UUID
     name: str
@@ -116,6 +120,10 @@ class GraphOut(APIModel):
     timeout_seconds: int
     created_at: datetime
     updated_at: datetime
+
+    node_count: int = Field(default=0, description="Person nodes materialized on this graph.")
+    edge_count: int = Field(default=0, description="Directed communication channels on this graph.")
+    session_count: int = Field(default=0, description="Chat sessions bound to this graph.")
 
 
 class GraphDetailOut(GraphOut):

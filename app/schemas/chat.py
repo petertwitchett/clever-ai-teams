@@ -40,6 +40,13 @@ class SessionOut(APIModel):
     last_message_at: datetime | None
     created_at: datetime
 
+    # Denormalized for the chat sidebar: lets a client render "which team am I
+    # talking to" and per-conversation activity without a request per session.
+    graph_name: str | None = Field(default=None, description="Name of the bound agent graph (team).")
+    graph_status: str | None = Field(default=None, description="Status of the bound graph.")
+    message_count: int = Field(default=0, description="Messages recorded in this session.")
+    run_count: int = Field(default=0, description="Orchestration runs started in this session.")
+
 
 class SessionUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)

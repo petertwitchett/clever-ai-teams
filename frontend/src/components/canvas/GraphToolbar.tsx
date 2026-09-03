@@ -19,9 +19,11 @@ interface GraphToolbarProps {
   onAddOrchestrator: () => void;
   onAddPersonNode: (role?: string) => void;
   onValidate: () => void;
+  onSaveDraft?: () => void;
   onCompileAndSave: () => void;
   onOpenTemplates: () => void;
   onOpenDSLModal: () => void;
+  isSaving?: boolean;
   isCompiling: boolean;
   validationStatus: { valid: boolean; message?: string } | null;
 }
@@ -30,9 +32,11 @@ export function GraphToolbar({
   onAddOrchestrator,
   onAddPersonNode,
   onValidate,
+  onSaveDraft,
   onCompileAndSave,
   onOpenTemplates,
   onOpenDSLModal,
+  isSaving = false,
   isCompiling,
   validationStatus,
 }: GraphToolbarProps) {
@@ -121,13 +125,23 @@ export function GraphToolbar({
         <span>Validate</span>
       </button>
 
+      {/* Save Draft (persists work in progress without compiling) */}
+      <button
+        onClick={onSaveDraft}
+        disabled={isSaving || isCompiling}
+        className="mat-btn mat-btn-outline px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-60"
+      >
+        <Save className="w-3.5 h-3.5 text-content-muted" />
+        <span>{isSaving ? "Saving..." : "Save Draft"}</span>
+      </button>
+
       {/* Compile & Save */}
       <button
         onClick={onCompileAndSave}
-        disabled={isCompiling}
-        className="mat-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 flex items-center gap-1.5 font-semibold shadow-xs"
+        disabled={isCompiling || isSaving}
+        className="mat-btn bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 flex items-center gap-1.5 font-semibold shadow-xs disabled:opacity-60"
       >
-        <Save className="w-3.5 h-3.5" />
+        <CheckCircle className="w-3.5 h-3.5" />
         <span>{isCompiling ? "Compiling..." : "Compile & Save"}</span>
       </button>
 

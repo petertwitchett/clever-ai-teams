@@ -69,3 +69,5 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+frontend/tsconfig.tsbuildinfo
+frontend/out/

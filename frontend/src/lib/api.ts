@@ -1,5 +1,7 @@
 import {
   GraphSummary,
+  GraphListItem,
+  GraphCompileResult,
   GraphDSL,
   ChatSession,
   ChatMessage,
@@ -19,6 +21,27 @@ const DEFAULT_API_BASE =
   (typeof window !== "undefined" && window.location.origin
     ? `${window.location.origin}/api/v1`
     : "https://app-912ec933-b93b-4612-b0f3-89d1351070b9.cleverapps.io/api/v1");
+
+/**
+ * Error carrying the HTTP status so callers can branch on it.
+ *
+ * The canvas library needs this: deleting a canvas that still has chat sessions
+ * answers 409, which the UI turns into a "delete history too?" confirmation
+ * rather than a generic failure toast.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly details?: unknown;
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
 
 class ApiClient {
   private baseUrl: string = DEFAULT_API_BASE;
@@ -94,21 +117,27 @@ class ApiClient {
       if (typeof window !== "undefined") {
         localStorage.removeItem("clever_ai_token");
       }
-      throw new Error("401 Unauthorized: Session expired or invalid token");
+      throw new ApiError("Session expired or invalid token", 401, "unauthenticated");
     }
 
     if (!res.ok) {
       const errorText = await res.text();
       let errorMsg = `API Error (${res.status}): ${errorText || res.statusText}`;
+      let code: string | undefined;
+      let details: any;
       try {
         const parsed = JSON.parse(errorText);
         if (parsed.detail) {
           errorMsg = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
         } else if (parsed.error?.message) {
           errorMsg = parsed.error.message;
+          code = parsed.error.code;
+          details = parsed.error.details;
         }
       } catch {}
-      throw new Error(errorMsg);
+      // Carry the HTTP status so callers can branch on it (e.g. a 409 from
+      // deleting a canvas that still owns chat sessions).
+      throw new ApiError(errorMsg, res.status, code, details);
     }
 
     return (await res.json()) as T;
@@ -200,30 +229,68 @@ class ApiClient {
   }
 
   // --- Graphs (Canvas Teams) ---
-  async getGraphs(): Promise<GraphSummary[]> {
-    const res = await this.request<{ items: any[]; total: number }>("/graphs?limit=50");
-    const summaries: GraphSummary[] = [];
 
-    // For each graph, fetch full detail so DSL is immediately available
-    for (const item of res.items || []) {
-      try {
-        const detail = await this.getGraph(item.id);
-        summaries.push(detail);
-      } catch {
-        summaries.push({
-          id: item.id,
-          name: item.name,
-          description: item.description || "",
-          is_compiled: item.status === "compiled",
-          is_published: item.is_public || false,
-          node_count: item.node_count || 0,
-          edge_count: item.edge_count || 0,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-        });
-      }
-    }
-    return summaries;
+  /**
+   * Canvas library listing.
+   *
+   * One request for any number of canvases: the backend returns node/edge/session
+   * counts per item, so we no longer fetch each graph's detail just to render a
+   * picker. Call `getGraph(id)` only for the canvas actually opened on the editor.
+   */
+  async listGraphs(
+    opts: {
+      limit?: number;
+      offset?: number;
+      search?: string;
+      status?: string;
+      ownedOnly?: boolean;
+      compiledOnly?: boolean;
+      sort?: "updated_at" | "created_at" | "name" | "sessions";
+    } = {}
+  ): Promise<{ items: GraphSummary[]; total: number }> {
+    const q = new URLSearchParams();
+    q.set("limit", String(opts.limit ?? 50));
+    if (opts.offset) q.set("offset", String(opts.offset));
+    if (opts.search) q.set("search", opts.search);
+    if (opts.status) q.set("status", opts.status);
+    if (opts.ownedOnly) q.set("owned_only", "true");
+    if (opts.compiledOnly) q.set("compiled_only", "true");
+    if (opts.sort) q.set("sort", opts.sort);
+
+    const res = await this.request<{ items: any[]; total: number }>(`/graphs?${q.toString()}`);
+    return {
+      total: res.total ?? 0,
+      items: (res.items || []).map((item) => this.toSummary(item)),
+    };
+  }
+
+  /** Map a backend graph row onto the UI summary shape (no DSL). */
+  private toSummary(item: any): GraphSummary {
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description || "",
+      status: item.status,
+      is_compiled: item.status === "compiled" || item.status === "published",
+      is_published: item.status === "published",
+      is_public: !!item.is_public,
+      node_count: item.node_count ?? 0,
+      edge_count: item.edge_count ?? 0,
+      session_count: item.session_count ?? 0,
+      version: item.version ?? 1,
+      stall_limit: item.stall_limit,
+      max_steps: item.max_steps,
+      timeout_seconds: item.timeout_seconds,
+      compilation_errors: item.compilation_errors || [],
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    };
+  }
+
+  /** Back-compat: previous callers expect a bare array. */
+  async getGraphs(): Promise<GraphSummary[]> {
+    const { items } = await this.listGraphs();
+    return items;
   }
 
   async getGraph(id: string): Promise<GraphSummary> {
@@ -313,71 +380,137 @@ class ApiClient {
     };
   }
 
-  async createGraph(dsl: GraphDSL): Promise<GraphSummary> {
-    const payload = {
-      name: dsl.name,
-      description: dsl.description,
-      is_public: true,
-      dsl: {
-        dsl_version: dsl.version,
-        metadata: { name: dsl.name, description: dsl.description },
-        orchestrator: {
-          node_key: "orchestrator",
-          stall_limit: dsl.orchestrator?.stall_threshold || 3,
-          max_steps: 20,
-        },
-        nodes: [
-          {
-            key: "orchestrator",
-            node_type: "orchestrator",
-            identity: {
-              display_name: dsl.orchestrator?.name || "Atlas",
-              professional_role: "Team Orchestrator",
-              primary_duty: dsl.orchestrator?.duty || "Decompose goals",
-            },
-            persona: { tone: "decisive", temperament: "calm", cognitive_style: "strategic" },
-            ethics: { absolute_constraints: [] },
-            brain: {
-              provider: dsl.orchestrator?.brain?.provider,
-              model: dsl.orchestrator?.brain?.model,
-              temperature: dsl.orchestrator?.brain?.temperature ?? 0.3,
-            },
-          },
-          ...dsl.nodes.map((n) => ({
-            key: n.identity.id || n.identity.name.toLowerCase().replace(/\s+/g, "_"),
-            node_type: n.identity.role.toLowerCase().includes("critic")
-              ? "critic"
-              : n.identity.role.toLowerCase().includes("dev")
-              ? "developer"
-              : "researcher",
-            identity: {
-              display_name: n.identity.name,
-              professional_role: n.identity.role,
-              primary_duty: n.identity.duty,
-            },
-            persona: n.persona,
-            ethics: { absolute_constraints: n.ethics?.negative_constraints || [] },
-            brain: {
-              provider: n.brain?.provider,
-              model: n.brain?.model,
-              temperature: n.brain?.temperature ?? 0.5,
-            },
-          })),
-        ],
-        edges: dsl.edges.map((e) => ({
-          source: e.source,
-          target: e.target,
-          channel: e.channel,
-          bidirectional: e.bidirectional || false,
-        })),
+  /** Serialize the canvas DSL into the backend wire format.
+   *
+   * Shared by create, draft-save and compile so all three send an identical
+   * document; a draft save followed by a bodyless compile must describe the
+   * same graph.
+   */
+  private serializeDSL(dsl: GraphDSL): any {
+    return {
+      dsl_version: dsl.version,
+      metadata: { name: dsl.name, description: dsl.description },
+      orchestrator: {
+        node_key: "orchestrator",
+        stall_limit: dsl.orchestrator?.stall_threshold || 3,
+        max_steps: 20,
       },
+      nodes: [
+        {
+          key: "orchestrator",
+          node_type: "orchestrator",
+          identity: {
+            display_name: dsl.orchestrator?.name || "Atlas",
+            professional_role: "Team Orchestrator",
+            primary_duty: dsl.orchestrator?.duty || "Decompose goals",
+          },
+          persona: { tone: "decisive", temperament: "calm", cognitive_style: "strategic" },
+          ethics: { absolute_constraints: [] },
+          brain: {
+            provider: dsl.orchestrator?.brain?.provider,
+            model: dsl.orchestrator?.brain?.model,
+            temperature: dsl.orchestrator?.brain?.temperature ?? 0.3,
+          },
+        },
+        ...dsl.nodes.map((n) => ({
+          key: n.identity.id || n.identity.name.toLowerCase().replace(/\s+/g, "_"),
+          node_type: n.identity.role.toLowerCase().includes("critic")
+            ? "critic"
+            : n.identity.role.toLowerCase().includes("dev")
+            ? "developer"
+            : "researcher",
+          identity: {
+            display_name: n.identity.name,
+            professional_role: n.identity.role,
+            primary_duty: n.identity.duty,
+          },
+          persona: n.persona,
+          ethics: { absolute_constraints: n.ethics?.negative_constraints || [] },
+          brain: {
+            provider: n.brain?.provider,
+            model: n.brain?.model,
+            temperature: n.brain?.temperature ?? 0.5,
+          },
+        })),
+      ],
+      edges: dsl.edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+        channel: e.channel,
+        bidirectional: e.bidirectional || false,
+      })),
     };
+  }
 
+  /** Canvas positions, keyed by node id, for round-tripping the visual layout. */
+  private serializeLayout(dsl: GraphDSL): Record<string, any> {
+    const positions: Record<string, any> = {};
+    if (dsl.orchestrator?.canvas_position) {
+      positions["orchestrator"] = dsl.orchestrator.canvas_position;
+    }
+    for (const n of dsl.nodes) {
+      const key = n.identity.id || n.identity.name.toLowerCase().replace(/\s+/g, "_");
+      if (n.canvas_position) positions[key] = n.canvas_position;
+    }
+    return { positions };
+  }
+
+  async createGraph(dsl: GraphDSL, opts?: { isPublic?: boolean }): Promise<GraphSummary> {
     const res = await this.request<any>("/graphs", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        name: dsl.name,
+        description: dsl.description,
+        is_public: opts?.isPublic ?? false,
+        dsl: this.serializeDSL(dsl),
+        canvas_layout: this.serializeLayout(dsl),
+      }),
     });
     return await this.getGraph(res.id);
+  }
+
+  /** Create an empty canvas (no DSL yet) so the user can start from scratch. */
+  async createBlankGraph(name: string, description = ""): Promise<GraphListItem> {
+    return await this.request<GraphListItem>("/graphs", {
+      method: "POST",
+      body: JSON.stringify({ name, description, is_public: false }),
+    });
+  }
+
+  /** Draft save: persist the canvas without compiling it. */
+  async saveGraphDraft(id: string, dsl: GraphDSL): Promise<GraphListItem> {
+    return await this.request<GraphListItem>(`/graphs/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: dsl.name,
+        description: dsl.description,
+        dsl: this.serializeDSL(dsl),
+        canvas_layout: this.serializeLayout(dsl),
+      }),
+    });
+  }
+
+  /** Rename / re-describe a canvas without touching its DSL. */
+  async updateGraphMeta(
+    id: string,
+    patch: { name?: string; description?: string; is_public?: boolean }
+  ): Promise<GraphListItem> {
+    return await this.request<GraphListItem>(`/graphs/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  }
+
+  async duplicateGraph(id: string, name?: string): Promise<GraphSummary> {
+    const qs = name ? `?name=${encodeURIComponent(name)}` : "";
+    const res = await this.request<any>(`/graphs/${id}/duplicate${qs}`, { method: "POST" });
+    return await this.getGraph(res.id);
+  }
+
+  /** Delete a canvas. Throws with a 409-derived message when chats still exist. */
+  async deleteGraph(id: string, opts?: { force?: boolean }): Promise<{ detail?: string }> {
+    const qs = opts?.force ? "?force=true" : "";
+    return await this.request<{ detail?: string }>(`/graphs/${id}${qs}`, { method: "DELETE" });
   }
 
   async validateGraph(dsl: GraphDSL): Promise<{ valid: boolean; errors?: string[] }> {
@@ -387,29 +520,62 @@ class ApiClient {
     });
   }
 
-  async compileGraph(id: string): Promise<{ status: string; compiled_at: string }> {
-    return await this.request<{ status: string; compiled_at: string }>(`/graphs/${id}/compile`, {
+  /** Compile a canvas.
+   *
+   * With a `dsl` the canvas is saved and compiled in one call. Without one the
+   * backend recompiles whatever DSL is already stored, which is what a
+   * "Compile" button needs after a series of draft saves.
+   */
+  async compileGraph(id: string, dsl?: GraphDSL): Promise<GraphCompileResult> {
+    return await this.request<GraphCompileResult>(`/graphs/${id}/compile`, {
       method: "POST",
+      body: dsl
+        ? JSON.stringify({ dsl: this.serializeDSL(dsl), canvas_layout: this.serializeLayout(dsl) })
+        : undefined,
     });
   }
 
-  async publishGraph(id: string): Promise<{ status: string }> {
-    return await this.request<{ status: string }>(`/graphs/${id}/publish`, {
-      method: "POST",
-    });
+  async publishGraph(id: string): Promise<GraphListItem> {
+    return await this.request<GraphListItem>(`/graphs/${id}/publish`, { method: "POST" });
+  }
+
+  /** Return a published canvas to compiled so it can be edited again. */
+  async unpublishGraph(id: string): Promise<GraphListItem> {
+    return await this.request<GraphListItem>(`/graphs/${id}/unpublish`, { method: "POST" });
   }
 
   // --- Sessions (Chat) ---
-  async getSessions(): Promise<ChatSession[]> {
-    const res = await this.request<{ items: any[]; total: number }>("/sessions?limit=50");
-    return (res.items || []).map((s: any) => ({
+
+  private normalizeSession(s: any): ChatSession {
+    return {
       id: s.id,
       title: s.title || "Strategy Session",
       graph_id: s.graph_id,
+      graph_name: s.graph_name,
+      graph_status: s.graph_status,
       created_at: s.created_at,
       updated_at: s.last_message_at || s.created_at,
-      message_count: 0,
-    }));
+      message_count: s.message_count ?? 0,
+      run_count: s.run_count ?? 0,
+      total_cost_usd: s.total_cost_usd ?? 0,
+    };
+  }
+
+  /**
+   * Conversation history. Pass `graphId` to scope the list to a single canvas,
+   * which is what a canvas-scoped chat sidebar needs.
+   */
+  async getSessions(opts?: {
+    graphId?: string;
+    search?: string;
+    limit?: number;
+  }): Promise<ChatSession[]> {
+    const params = new URLSearchParams({ limit: String(opts?.limit ?? 50) });
+    if (opts?.graphId) params.set("graph_id", opts.graphId);
+    if (opts?.search) params.set("search", opts.search);
+
+    const res = await this.request<{ items: any[]; total: number }>(`/sessions?${params}`);
+    return (res.items || []).map((s) => this.normalizeSession(s));
   }
 
   async createSession(graphId: string, title?: string): Promise<ChatSession> {
@@ -417,14 +583,21 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify({ graph_id: graphId, title: title || "New Strategy Session" }),
     });
-    return {
-      id: res.id,
-      title: res.title,
-      graph_id: res.graph_id,
-      created_at: res.created_at,
-      updated_at: res.last_message_at || res.created_at,
-      message_count: 0,
-    };
+    return this.normalizeSession(res);
+  }
+
+  async renameSession(sessionId: string, title: string): Promise<ChatSession> {
+    const res = await this.request<any>(`/sessions/${sessionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    });
+    return this.normalizeSession(res);
+  }
+
+  async deleteSession(sessionId: string): Promise<{ detail?: string }> {
+    return await this.request<{ detail?: string }>(`/sessions/${sessionId}`, {
+      method: "DELETE",
+    });
   }
 
   async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {

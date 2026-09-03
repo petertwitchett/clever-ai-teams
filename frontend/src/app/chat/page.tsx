@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import {
@@ -31,6 +32,7 @@ import {
   Cpu,
   CornerDownLeft,
   XCircle,
+  Pencil,
 } from "lucide-react";
 
 function ChatContent() {
@@ -45,6 +47,8 @@ function ChatContent() {
   const [inputText, setInputText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [streamingStep, setStreamingStep] = useState<string>("Orchestrator decomposing milestones...");
 
   // Ledgers State
@@ -85,24 +89,19 @@ function ChatContent() {
     },
   ];
 
-  // Load Graphs and Sessions
+  // Load the chat-ready canvases. Only compiled/published graphs can host a
+  // conversation, so the picker is filtered server-side.
   useEffect(() => {
     async function init() {
       try {
-        const [gList, sList] = await Promise.all([
-          api.getGraphs(),
-          api.getSessions(),
-        ]);
+        const page = await api.listGraphs({ compiledOnly: true, limit: 100 });
+        const gList = page.items;
         setGraphs(gList);
-        setSessions(sList);
 
-        const initialGraphId = graphParam || (gList[0] ? gList[0].id : "");
+        const initialGraphId =
+          (graphParam && gList.some((g) => g.id === graphParam) ? graphParam : "") ||
+          (gList[0] ? gList[0].id : "");
         setSelectedGraphId(initialGraphId);
-
-        if (sList.length > 0) {
-          const matched = sList.find((s) => s.graph_id === initialGraphId) || sList[0];
-          setCurrentSession(matched);
-        }
       } catch (err) {
         console.error("Init chat failed:", err);
       }
@@ -110,9 +109,45 @@ function ChatContent() {
     init();
   }, [graphParam]);
 
+  // Conversation history is scoped to the selected canvas: switching teams
+  // switches the session list, so histories from different teams never mix.
+  useEffect(() => {
+    if (!selectedGraphId) {
+      setSessions([]);
+      setCurrentSession(null);
+      return;
+    }
+    let cancelled = false;
+    async function loadCanvasSessions() {
+      setLoadingSessions(true);
+      try {
+        const list = await api.getSessions({ graphId: selectedGraphId, limit: 100 });
+        if (cancelled) return;
+        setSessions(list);
+        setCurrentSession((current) =>
+          current && list.some((s) => s.id === current.id) ? current : list[0] ?? null
+        );
+      } catch (err) {
+        if (!cancelled) console.error("Load canvas sessions failed:", err);
+      } finally {
+        if (!cancelled) setLoadingSessions(false);
+      }
+    }
+    loadCanvasSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedGraphId]);
+
   // Load Messages for Current Session
   useEffect(() => {
-    if (!currentSession) return;
+    if (!currentSession) {
+      setMessages([]);
+      setTaskLedger(null);
+      setProgressLedger(null);
+      setCritiques([]);
+      return;
+    }
     async function loadSessionData() {
       try {
         const msgs = await api.getSessionMessages(currentSession!.id);
@@ -163,23 +198,57 @@ function ChatContent() {
     }
   };
 
-  // Create New Session
+  // Open a new conversation on the currently selected canvas.
   const handleNewSession = async () => {
+    const gId = selectedGraphId || (graphs[0] ? graphs[0].id : "");
+    if (!gId) {
+      setSessionError("Compile a canvas first — a conversation must be bound to a compiled team.");
+      return;
+    }
     try {
-      const gId = selectedGraphId || (graphs[0] ? graphs[0].id : "");
       const title = `Session #${sessions.length + 1} (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`;
       const created = await api.createSession(gId, title);
-      setSessions([created, ...sessions]);
+      setSessions((prev) => [created, ...prev]);
       setCurrentSession(created);
       setMessages([]);
       setTaskLedger(null);
       setProgressLedger(null);
       setCritiques([]);
-      if (textareaRef.current) {
-        textareaRef.current.focus();
+      setSessionError(null);
+      textareaRef.current?.focus();
+    } catch (err: any) {
+      setSessionError(err?.message || "Could not open a session on this canvas.");
+    }
+  };
+
+  // Rename a conversation.
+  const handleRenameSession = async (session: ChatSession) => {
+    const next = window.prompt("Rename conversation", session.title);
+    if (!next || next.trim() === session.title) return;
+    try {
+      const updated = await api.renameSession(session.id, next.trim());
+      setSessions((prev) => prev.map((s) => (s.id === session.id ? { ...s, title: updated.title } : s)));
+      setCurrentSession((prev) => (prev?.id === session.id ? { ...prev, title: updated.title } : prev));
+    } catch (err: any) {
+      setSessionError(err?.message || "Rename failed.");
+    }
+  };
+
+  // Delete a conversation and its history.
+  const handleDeleteSession = async (session: ChatSession) => {
+    if (!window.confirm(`Delete "${session.title}" and its full message history?`)) return;
+    try {
+      await api.deleteSession(session.id);
+      setSessions((prev) => prev.filter((s) => s.id !== session.id));
+      if (currentSession?.id === session.id) {
+        setCurrentSession(null);
+        setMessages([]);
+        setTaskLedger(null);
+        setProgressLedger(null);
+        setCritiques([]);
       }
-    } catch (err) {
-      console.error("Create session error:", err);
+    } catch (err: any) {
+      setSessionError(err?.message || "Delete failed.");
     }
   };
 
@@ -191,9 +260,26 @@ function ChatContent() {
     let sess = currentSession;
     if (!sess) {
       const gId = selectedGraphId || (graphs[0] ? graphs[0].id : "");
-      sess = await api.createSession(gId, `Session #${sessions.length + 1}`);
-      setSessions([sess, ...sessions]);
-      setCurrentSession(sess);
+      if (!gId) {
+        setSessionError("Select a compiled canvas before sending a command.");
+        return;
+      }
+      try {
+        sess = await api.createSession(gId, `Session #${sessions.length + 1}`);
+        setSessions((prev) => [sess as ChatSession, ...prev]);
+        setCurrentSession(sess);
+        setSessionError(null);
+      } catch (err: any) {
+        setSessionError(err?.message || "Could not open a session on this canvas.");
+        return;
+      }
+    }
+
+    // A conversation is bound to the canvas it was opened on. If the picker has
+    // moved on since, keep the selector honest rather than running one canvas's
+    // command against another canvas's team.
+    if (sess.graph_id !== selectedGraphId) {
+      setSelectedGraphId(sess.graph_id);
     }
 
     const sessionId = sess.id;
@@ -276,56 +362,108 @@ function ChatContent() {
           </button>
         </div>
 
-        {/* Team Selector */}
+        {/* Canvas selector: only compiled/published teams can host a chat. */}
         <div className="p-3 border-b border-surface-border">
           <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider block px-1 mb-1.5 flex items-center gap-1">
             <Cpu className="w-3 h-3 text-primary" />
-            <span>Active Team Graph</span>
+            <span>Active Team Canvas</span>
           </label>
-          <select
-            value={selectedGraphId}
-            onChange={(e) => setSelectedGraphId(e.target.value)}
-            className="mat-input text-xs py-1.5 px-2.5 font-medium w-full"
-          >
-            {graphs.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
+          {graphs.length === 0 ? (
+            <Link
+              href="/canvas"
+              className="block text-[11px] text-center px-2.5 py-2 rounded-lg border border-dashed border-surface-border text-content-muted hover:text-primary hover:border-primary/40 transition-colors"
+            >
+              No compiled canvas yet — build one
+            </Link>
+          ) : (
+            <>
+              <select
+                value={selectedGraphId}
+                onChange={(e) => setSelectedGraphId(e.target.value)}
+                className="mat-input text-xs py-1.5 px-2.5 font-medium w-full"
+              >
+                {graphs.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                    {g.session_count ? ` (${g.session_count})` : ""}
+                  </option>
+                ))}
+              </select>
+              {activeGraph && (
+                <div className="flex items-center gap-2 mt-1.5 px-1 text-[10px] text-content-muted font-mono">
+                  <span>{activeGraph.node_count} agents</span>
+                  <span>·</span>
+                  <span>{activeGraph.edge_count} channels</span>
+                  <Link href={`/canvas?graph=${activeGraph.id}`} className="ml-auto text-primary hover:underline">
+                    Edit
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
-        {/* Sessions List */}
+        {sessionError && (
+          <div className="mx-3 mb-2 px-2.5 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-500">
+            {sessionError}
+          </div>
+        )}
+
+        {/* Conversations on the selected canvas */}
         <div className="flex-1 p-2.5 overflow-y-auto space-y-1.5 text-xs">
           <div className="flex items-center justify-between px-2 py-1 text-[10px] font-bold text-content-subtle uppercase tracking-wider">
-            <span>Sessions History</span>
+            <span>Conversations</span>
             <span className="px-1.5 py-0.2 rounded bg-surface-hover font-mono">
-              {sessions.length}
+              {loadingSessions ? "…" : sessions.length}
             </span>
           </div>
+
+          {!loadingSessions && sessions.length === 0 && (
+            <p className="px-2 py-3 text-[11px] text-content-muted leading-relaxed">
+              No conversations on this canvas yet. Send a command to start one.
+            </p>
+          )}
 
           {sessions.map((s) => {
             const isSelected = currentSession?.id === s.id;
             return (
-              <button
+              <div
                 key={s.id}
-                onClick={() => setCurrentSession(s)}
-                className={`w-full text-left p-3 rounded-xl transition-all block group relative ${
+                className={`w-full p-3 rounded-xl transition-all group relative ${
                   isSelected
                     ? "bg-primary/15 text-primary font-bold shadow-xs border border-primary/30"
                     : "text-content-main hover:bg-surface-hover font-medium border border-transparent"
                 }`}
               >
-                <div className="flex items-center justify-between gap-1">
-                  <span className="truncate block flex-1">{s.title}</span>
-                  {isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  )}
+                <button onClick={() => setCurrentSession(s)} className="w-full text-left block">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="truncate block flex-1">{s.title}</span>
+                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                  </div>
+                  <span className="text-[10px] text-content-muted block mt-1 font-mono">
+                    {new Date(s.created_at).toLocaleDateString()} ·{" "}
+                    {s.message_count ?? 0} msg
+                    {s.run_count ? ` · ${s.run_count} run${s.run_count === 1 ? "" : "s"}` : ""}
+                  </span>
+                </button>
+
+                <div className="absolute top-2 right-2 hidden group-hover:flex items-center gap-1">
+                  <button
+                    onClick={() => handleRenameSession(s)}
+                    title="Rename"
+                    className="p-1 rounded hover:bg-surface-card text-content-muted hover:text-primary"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteSession(s)}
+                    title="Delete conversation"
+                    className="p-1 rounded hover:bg-surface-card text-content-muted hover:text-rose-500"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
                 </div>
-                <span className="text-[10px] text-content-muted block mt-1 font-mono">
-                  {new Date(s.created_at).toLocaleDateString()} • {new Date(s.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </button>
+              </div>
             );
           })}
         </div>

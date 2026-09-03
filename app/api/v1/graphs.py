@@ -10,13 +10,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DBSession, rate_limit
-from app.core.errors import AuthorizationError, NotFoundError, ValidationFailedError
+from app.core.errors import AuthorizationError, ConflictError, NotFoundError, ValidationFailedError
 from app.models import AgentGraph, ChatSession, GraphEdge, GraphStatus, PersonNode, UserRole
 from app.schemas import (
     GraphCompileRequest,
     GraphCompileResponse,
     GraphCreate,
     GraphDetailOut,
+    GraphDSL,
     GraphOut,
     GraphUpdate,
     Page,
@@ -167,22 +168,91 @@ async def get_graph(graph_id: uuid.UUID, db: DBSession, user: CurrentUser) -> Ag
     return result.scalar_one()
 
 
-@router.patch("/{graph_id}", response_model=GraphOut, summary="Update graph metadata / layout")
+@router.patch(
+    "/{graph_id}",
+    response_model=GraphOut,
+    summary="Update / save a graph (draft save, no compile)",
+    description=(
+        "Patches canvas metadata, orchestration limits, layout, and optionally the DSL itself.\n\n"
+        "Passing `dsl` performs a **draft save**: the canvas is persisted as-is without "
+        "validation, so an editor can autosave incomplete work. A previously compiled graph "
+        "returns to `draft` when its DSL changes, since the stored nodes/edges no longer match "
+        "what is on the canvas — call `/compile` to make it executable again."
+    ),
+)
 async def update_graph(graph_id: uuid.UUID, payload: GraphUpdate, db: DBSession, user: CurrentUser) -> AgentGraph:
     graph = await _get_owned_graph(db, graph_id, user)
-    for field in ("name", "description", "canvas_layout", "is_public"):
+
+    for field in ("name", "description", "canvas_layout", "is_public",
+                  "max_steps", "stall_limit", "timeout_seconds"):
         value = getattr(payload, field)
         if value is not None:
             setattr(graph, field, value)
+
+    if payload.dsl is not None:
+        graph.dsl = payload.dsl.model_dump(mode="json")
+        # The compiled nodes/edges now describe an older canvas, so the graph is
+        # no longer safe to execute until it is recompiled.
+        if graph.status in (GraphStatus.COMPILED, GraphStatus.PUBLISHED):
+            graph.status = GraphStatus.DRAFT
+            graph.compiled_at = None
+        if payload.name is None:
+            graph.name = payload.dsl.metadata.name
+
     await db.flush()
     return graph
 
 
-@router.delete("/{graph_id}", response_model=StatusResponse, summary="Delete a graph")
-async def delete_graph(graph_id: uuid.UUID, db: DBSession, user: CurrentUser) -> StatusResponse:
+@router.delete(
+    "/{graph_id}",
+    response_model=StatusResponse,
+    summary="Delete a graph",
+    description=(
+        "Deletes a canvas. If conversations are still bound to it the request is refused with a "
+        "422 naming the session count, because removing the canvas would destroy that chat "
+        "history. Pass `force=true` to delete the canvas together with its sessions, runs and "
+        "messages."
+    ),
+)
+async def delete_graph(
+    graph_id: uuid.UUID,
+    db: DBSession,
+    user: CurrentUser,
+    force: bool = Query(
+        default=False, description="Also delete the canvas's chat sessions and their history"
+    ),
+) -> StatusResponse:
     graph = await _get_owned_graph(db, graph_id, user)
+
+    session_total = (
+        await db.execute(
+            select(func.count(ChatSession.id)).where(ChatSession.graph_id == graph_id)
+        )
+    ).scalar() or 0
+
+    if session_total and not force:
+        raise ConflictError(
+            f"This canvas still has {session_total} chat session(s). "
+            "Re-send with force=true to delete the canvas and its conversation history.",
+            details={"session_count": session_total},
+        )
+
+    if session_total:
+        # ORM-level delete so ChatSession's own cascades remove runs and messages.
+        sessions = (
+            (await db.execute(select(ChatSession).where(ChatSession.graph_id == graph_id)))
+            .scalars()
+            .all()
+        )
+        for session in sessions:
+            await db.delete(session)
+        await db.flush()
+
     await db.delete(graph)
-    return StatusResponse(detail=f"Graph {graph_id} deleted")
+    return StatusResponse(
+        detail=f"Graph {graph_id} deleted"
+        + (f" together with {session_total} session(s)" if session_total else "")
+    )
 
 
 @router.post(
@@ -214,17 +284,41 @@ async def validate_graph_dsl(payload: GraphCompileRequest, user: CurrentUser) ->
     ),
 )
 async def compile_graph_endpoint(
-    graph_id: uuid.UUID, payload: GraphCompileRequest, db: DBSession, user: CurrentUser
+    graph_id: uuid.UUID,
+    db: DBSession,
+    user: CurrentUser,
+    payload: GraphCompileRequest | None = None,
 ) -> GraphCompileResponse:
-    await _get_owned_graph(db, graph_id, user)
-    graph, issues = await compile_graph(db, graph_id, payload.dsl, payload.canvas_layout)
+    graph = await _get_owned_graph(db, graph_id, user)
+
+    # With no body, recompile whatever DSL is already stored on the canvas.
+    # This is what a "Compile" button needs after a sequence of draft saves.
+    if payload is None:
+        if not graph.dsl:
+            raise ValidationFailedError(
+                "This canvas has no saved DSL to compile. Save the canvas first, or send a DSL "
+                "in the request body."
+            )
+        try:
+            dsl = GraphDSL.model_validate(graph.dsl)
+        except PydanticValidationError as exc:
+            raise ValidationFailedError(
+                "The saved DSL is structurally invalid and cannot be compiled.",
+                details={"errors": exc.errors(include_url=False)[:20]},
+            ) from exc
+        canvas_layout = None
+    else:
+        dsl = payload.dsl
+        canvas_layout = payload.canvas_layout
+
+    graph, issues = await compile_graph(db, graph_id, dsl, canvas_layout)
     return GraphCompileResponse(
         graph_id=graph.id,
         status=graph.status,
         version=graph.version,
         issues=issues,
-        node_count=len(payload.dsl.nodes),
-        edge_count=len(payload.dsl.edges),
+        node_count=len(dsl.nodes),
+        edge_count=len(dsl.edges),
     )
 
 
@@ -291,5 +385,25 @@ async def publish_graph(graph_id: uuid.UUID, db: DBSession, user: CurrentUser) -
     if graph.status not in (GraphStatus.COMPILED, GraphStatus.PUBLISHED):
         raise ValidationFailedError(f"Only compiled graphs can be published (current status: {graph.status}).")
     graph.status = GraphStatus.PUBLISHED
+    await db.flush()
+    return graph
+
+
+@router.post(
+    "/{graph_id}/unpublish",
+    response_model=GraphOut,
+    summary="Unpublish a graph back to compiled",
+    description=(
+        "Reverts a published canvas to `compiled`. The team stays fully usable for chat; it simply "
+        "stops being offered as a published/shared team. Publishing is therefore reversible."
+    ),
+)
+async def unpublish_graph(graph_id: uuid.UUID, db: DBSession, user: CurrentUser) -> AgentGraph:
+    graph = await _get_owned_graph(db, graph_id, user)
+    if graph.status != GraphStatus.PUBLISHED:
+        raise ValidationFailedError(
+            f"Only published graphs can be unpublished (current status: {graph.status})."
+        )
+    graph.status = GraphStatus.COMPILED
     await db.flush()
     return graph

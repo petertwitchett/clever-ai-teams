@@ -37,14 +37,18 @@ const edgeTypes = {
 interface GraphCanvasProps {
   initialDSL?: GraphDSL;
   graphId?: string;
-  onSaved?: (dsl: GraphDSL) => void;
+  /** Fired after a successful save, with the mode that produced it. */
+  onSaved?: (dsl: GraphDSL, mode: "draft" | "compiled") => void;
+  /** Fired when an unsaved canvas is persisted for the first time. */
+  onCreated?: (graphId: string) => void;
 }
 
-export function GraphCanvas({ initialDSL, graphId, onSaved }: GraphCanvasProps) {
+export function GraphCanvas({ initialDSL, graphId, onSaved, onCreated }: GraphCanvasProps) {
   const [selectedPersona, setSelectedPersona] = useState<PersonNodeManifest | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [dslModalOpen, setDslModalOpen] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [copiedDSL, setCopiedDSL] = useState(false);
   const [validationStatus, setValidationStatus] = useState<{
     valid: boolean;
@@ -209,7 +213,29 @@ export function GraphCanvas({ initialDSL, graphId, onSaved }: GraphCanvasProps) 
     }
   };
 
-  // Compile & Save
+  // Draft save: persist the canvas as-is, without requiring a valid graph.
+  const handleSaveDraft = async () => {
+    setIsSaving(true);
+    try {
+      const dsl = exportCurrentDSL();
+      let targetId = graphId;
+      if (!targetId) {
+        const created = await api.createGraph(dsl);
+        targetId = created.id;
+        onCreated?.(created.id);
+      } else {
+        await api.saveGraphDraft(targetId, dsl);
+      }
+      setValidationStatus({ valid: true, message: "Draft saved." });
+      onSaved?.(dsl, "draft");
+    } catch (err: any) {
+      setValidationStatus({ valid: false, message: err.message || "Save failed" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Compile & Save: send the *current* canvas DSL so edits are never lost.
   const handleCompileAndSave = async () => {
     setIsCompiling(true);
     try {
@@ -218,13 +244,27 @@ export function GraphCanvas({ initialDSL, graphId, onSaved }: GraphCanvasProps) 
       if (!targetId) {
         const created = await api.createGraph(dsl);
         targetId = created.id;
+        onCreated?.(created.id);
       }
-      await api.compileGraph(targetId);
+      // Always pass the edited DSL: compiling without a body would rebuild the
+      // previously stored canvas and silently drop the current edits.
+      const result = await api.compileGraph(targetId, dsl);
+      const errors = (result.issues || []).filter((i) => i.severity === "error");
+      if (errors.length) {
+        setValidationStatus({
+          valid: false,
+          message: errors.map((e) => e.message).join(" · "),
+        });
+        return;
+      }
+      const warnings = (result.issues || []).filter((i) => i.severity === "warning");
       setValidationStatus({
         valid: true,
-        message: "Successfully Compiled & Saved to Clever Cloud DB!",
+        message: warnings.length
+          ? `Compiled with ${warnings.length} warning(s): ${warnings[0].message}`
+          : `Compiled v${result.version} — ${result.node_count} nodes, ${result.edge_count} channels. Ready to chat.`,
       });
-      if (onSaved) onSaved(dsl);
+      onSaved?.(dsl, "compiled");
     } catch (err: any) {
       setValidationStatus({
         valid: false,
@@ -313,9 +353,11 @@ export function GraphCanvas({ initialDSL, graphId, onSaved }: GraphCanvasProps) 
         onAddOrchestrator={handleAddOrchestrator}
         onAddPersonNode={handleAddPersonNode}
         onValidate={handleValidate}
+        onSaveDraft={handleSaveDraft}
         onCompileAndSave={handleCompileAndSave}
         onOpenTemplates={() => {}}
         onOpenDSLModal={() => setDslModalOpen(true)}
+        isSaving={isSaving}
         isCompiling={isCompiling}
         validationStatus={validationStatus}
       />

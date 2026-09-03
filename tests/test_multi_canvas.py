@@ -175,6 +175,75 @@ def main() -> int:
         r = client.get(f"/api/v1/graphs/{created[0]}", headers=headers)
         check(len(r.json()["nodes"]) == 3, "source canvas untouched by clone")
 
+        # ---- edit metadata + orchestration limits ----
+        r = client.patch(
+            f"/api/v1/graphs/{created[2]}",
+            headers=headers,
+            json={
+                "name": f"Gamma Renamed {suffix}",
+                "description": "edited description",
+                "stall_limit": 6,
+                "max_steps": 25,
+                "timeout_seconds": 300,
+            },
+        )
+        check(r.status_code == 200, "edit canvas metadata", f"({r.status_code}) {r.text[:160]}")
+        edited = r.json()
+        check(edited["name"] == f"Gamma Renamed {suffix}", "rename persisted", edited["name"])
+        check(edited["stall_limit"] == 6, "stall_limit persisted", str(edited["stall_limit"]))
+        check(edited["max_steps"] == 25, "max_steps persisted", str(edited["max_steps"]))
+        check(edited["timeout_seconds"] == 300, "timeout persisted", str(edited["timeout_seconds"]))
+
+        # ---- draft save of a DSL sends a compiled canvas back to draft ----
+        two_node = _dsl(f"Gamma Renamed {suffix}")
+        two_node["nodes"] = two_node["nodes"][:2]  # drop the critic
+        two_node["edges"] = [two_node["edges"][0]]
+        r = client.patch(
+            f"/api/v1/graphs/{created[2]}",
+            headers=headers,
+            json={"dsl": two_node, "canvas_layout": {"zoom": 1.4}},
+        )
+        check(r.status_code == 200, "draft-save DSL", f"({r.status_code}) {r.text[:160]}")
+        check(r.json()["status"] == "draft", "compiled canvas returns to draft on DSL edit",
+              r.json()["status"])
+
+        # stored nodes still describe the OLD canvas until recompiled
+        r = client.get(f"/api/v1/graphs/{created[2]}", headers=headers)
+        detail = r.json()
+        check(len(detail["nodes"]) == 3, "nodes unchanged before recompile",
+              f"n={len(detail['nodes'])}")
+        check(detail["canvas_layout"].get("zoom") == 1.4, "canvas layout round-trips")
+
+        # ---- recompile from the stored DSL (no body) ----
+        r = client.post(f"/api/v1/graphs/{created[2]}/compile", headers=headers)
+        check(r.status_code == 200, "recompile stored DSL without body",
+              f"({r.status_code}) {r.text[:200]}")
+        check(r.json()["status"] == "compiled", "recompiled to compiled", r.json()["status"])
+        r = client.get(f"/api/v1/graphs/{created[2]}", headers=headers)
+        check(len(r.json()["nodes"]) == 2, "recompile rebuilt nodes from edited DSL",
+              f"n={len(r.json()['nodes'])}")
+        check(len(r.json()["edges"]) == 1, "recompile rebuilt edges",
+              f"n={len(r.json()['edges'])}")
+
+        # ---- publish / unpublish round trip ----
+        r = client.post(f"/api/v1/graphs/{created[1]}/publish", headers=headers)
+        check(r.status_code == 200 and r.json()["status"] == "published", "publish canvas",
+              r.json().get("status", r.text[:120]))
+        r = client.post(f"/api/v1/graphs/{created[1]}/unpublish", headers=headers)
+        check(r.status_code == 200 and r.json()["status"] == "compiled", "unpublish back to compiled",
+              r.json().get("status", r.text[:120]))
+
+        # published canvases remain chat-eligible
+        r = client.post(f"/api/v1/graphs/{created[1]}/publish", headers=headers)
+        r = client.get("/api/v1/graphs", headers=headers,
+                       params={"compiled_only": True, "limit": 100})
+        check(created[1] in {g["id"] for g in r.json()["items"]},
+              "published canvas still chat-eligible")
+
+        # ---- recompiling a canvas with no DSL is refused, not a 500 ----
+        r = client.post(f"/api/v1/graphs/{draft_id}/compile", headers=headers)
+        check(r.status_code == 422, "compile with no stored DSL refused", f"({r.status_code})")
+
         # ---- sessions per canvas ----
         s_ids: dict[str, str] = {}
         for gid, title in ((created[0], "alpha chat"), (created[1], "beta chat")):
@@ -209,17 +278,56 @@ def main() -> int:
             "session title search works",
         )
 
-        # session_count on the graph reflects the new session
-        r = client.get("/api/v1/graphs", headers=headers, params={"search": names[0]})
-        check(r.json()["items"][0]["session_count"] >= 1, "graph session_count updated")
+        # session_count on the graph reflects the new session. Select by id: the
+        # search also matches the clone, whose description embeds the source name.
+        r = client.get("/api/v1/graphs", headers=headers, params={"search": suffix, "limit": 100})
+        by_id = {g["id"]: g for g in r.json()["items"]}
+        check(
+            by_id[created[0]]["session_count"] >= 1,
+            "graph session_count updated",
+            f"={by_id[created[0]]['session_count']}",
+        )
+        check(
+            by_id[clone["id"]]["session_count"] == 0,
+            "unused clone reports zero sessions",
+        )
 
         # ---- draft cannot be chatted with ----
         r = client.post("/api/v1/sessions", headers=headers, json={"graph_id": draft_id})
         check(r.status_code == 422, "draft canvas rejected for chat", f"({r.status_code})")
 
+        # ---- delete guard: a canvas with chat history must not 500 ----
+        r = client.delete(f"/api/v1/graphs/{created[0]}", headers=headers)
+        check(
+            r.status_code == 409,
+            "deleting a canvas with sessions is refused cleanly",
+            f"({r.status_code})",
+        )
+        body = r.json().get("error", {})
+        check(
+            "session" in (body.get("message") or "").lower(),
+            "refusal explains the blocking sessions",
+        )
+        r = client.get(f"/api/v1/graphs/{created[0]}", headers=headers)
+        check(r.status_code == 200, "blocked canvas still intact after refusal")
+
+        # force=true cascades the sessions away with the canvas
+        r = client.delete(
+            f"/api/v1/graphs/{created[0]}", headers=headers, params={"force": "true"}
+        )
+        check(r.status_code == 200, "force delete removes canvas + history", f"({r.status_code})")
+        r = client.get(f"/api/v1/graphs/{created[0]}", headers=headers)
+        check(r.status_code == 404, "force-deleted canvas is gone")
+        r = client.get("/api/v1/sessions", headers=headers, params={"graph_id": created[0]})
+        check(r.json()["total"] == 0, "its sessions were cascaded")
+
+        # a canvas with no sessions deletes without force
+        r = client.delete(f"/api/v1/graphs/{draft_id}", headers=headers)
+        check(r.status_code == 200, "session-free canvas deletes directly", f"({r.status_code})")
+
         # ---- cleanup ----
-        for gid in [*created, draft_id, clone["id"]]:
-            client.delete(f"/api/v1/graphs/{gid}", headers=headers)
+        for gid in [*created[1:], clone["id"]]:
+            client.delete(f"/api/v1/graphs/{gid}", headers=headers, params={"force": "true"})
 
     passed = sum(1 for ok, _, _ in RESULTS if ok)
     failed = len(RESULTS) - passed

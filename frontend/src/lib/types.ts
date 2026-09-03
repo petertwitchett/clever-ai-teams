@@ -91,14 +91,68 @@ export interface GraphDSL {
   edges: GraphEdgeDSL[];
 }
 
+export type GraphStatus = "draft" | "compiled" | "published" | "archived";
+
+/**
+ * One entry of the canvas library.
+ *
+ * This is what `GET /graphs` returns per item: enough to render a picker or a
+ * card grid (counts included) without fetching each canvas's full DSL.
+ */
+export interface GraphListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string;
+  status: GraphStatus;
+  version: number;
+  is_public: boolean;
+  is_template: boolean;
+  compiled_at: string | null;
+  compilation_errors: string[];
+  max_steps: number;
+  stall_limit: number;
+  timeout_seconds: number;
+  node_count: number;
+  edge_count: number;
+  session_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GraphCompileIssue {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+  node_key?: string | null;
+  edge_index?: number | null;
+}
+
+export interface GraphCompileResult {
+  graph_id: string;
+  status: GraphStatus;
+  version: number;
+  issues: GraphCompileIssue[];
+  node_count: number;
+  edge_count: number;
+}
+
 export interface GraphSummary {
   id: string;
   name: string;
   description: string;
+  status?: GraphStatus;
   is_compiled: boolean;
   is_published: boolean;
   node_count: number;
   edge_count: number;
+  session_count?: number;
+  version?: number;
+  is_public?: boolean;
+  stall_limit?: number;
+  max_steps?: number;
+  timeout_seconds?: number;
+  compilation_errors?: string[];
   created_at: string;
   updated_at: string;
   dsl?: GraphDSL;
@@ -109,9 +163,13 @@ export interface ChatSession {
   title: string;
   graph_id: string;
   graph_name?: string;
+  graph_status?: GraphStatus | string | null;
+  status?: string;
   created_at: string;
   updated_at: string;
   message_count?: number;
+  run_count?: number;
+  total_cost_usd?: number;
 }
 
 export interface ChatMessage {

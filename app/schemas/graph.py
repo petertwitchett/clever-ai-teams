@@ -24,18 +24,34 @@ class GraphCreate(BaseModel):
 
 
 class GraphUpdate(BaseModel):
-    """Patch a graph's metadata or layout."""
+    """Patch a graph's metadata, layout, or DSL.
+
+    Supplying ``dsl`` saves the canvas *without* compiling it, which is what an
+    autosaving editor needs: work in progress is persisted even when the graph is
+    structurally incomplete. Call ``/compile`` to promote it to executable.
+    """
 
     name: str | None = Field(default=None, min_length=1, max_length=128)
     description: str | None = Field(default=None, max_length=4000)
+    dsl: GraphDSL | None = Field(
+        default=None,
+        description="Persist the canvas DSL without compiling (draft save).",
+    )
     canvas_layout: dict[str, Any] | None = None
     is_public: bool | None = None
+    max_steps: int | None = Field(default=None, ge=1, le=500)
+    stall_limit: int | None = Field(default=None, ge=1, le=50)
+    timeout_seconds: int | None = Field(default=None, ge=30, le=7200)
 
 
 class GraphCompileRequest(BaseModel):
-    """Compile a DSL document into an executable graph."""
+    """Compile a DSL document into an executable graph.
 
-    dsl: GraphDSL
+    ``dsl`` may be omitted to recompile whatever is already stored on the graph
+    (useful after a draft save, or to re-validate after a schema change).
+    """
+
+    dsl: GraphDSL | None = None
     canvas_layout: dict[str, Any] = Field(default_factory=dict, description="Raw canvas state for round-tripping.")
 
 

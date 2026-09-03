@@ -41,13 +41,19 @@ HTTP 429 on breach). Errors use a stable envelope:
 | Method | Path | Description |
 |---|---|---|
 | POST | `` | Create graph; optional inline `dsl` compiles immediately → GraphDetailOut |
-| GET | `` | Paginated list (`status`, `include_public`, `limit`, `offset`) |
+| GET | `` | Canvas library: paginated, counts included (`search`, `status`, `include_public`, `owned_only`, `compiled_only`, `sort`, `limit`, `offset`) |
 | GET | `/{id}` | Graph with materialized nodes and edges |
-| PATCH | `/{id}` | Update name/description/layout/visibility |
-| DELETE | `/{id}` | Delete graph (cascades nodes/edges) |
+| PATCH | `/{id}` | Update name/description/layout/visibility/limits; passing `dsl` is a **draft save** (compiled → draft) |
+| DELETE | `/{id}` | Delete graph. **409** when sessions exist; `force=true` cascades sessions/runs/messages |
 | POST | `/validate` | **Dry-run** DSL validation; returns issues without persisting |
-| POST | `/{id}/compile` | Validate + materialize nodes/edges + bump version → GraphCompileResponse |
+| POST | `/{id}/compile` | Validate + materialize nodes/edges + bump version. Body optional — omit it to recompile the stored DSL |
+| POST | `/{id}/duplicate` | Clone a canvas (`name?`) into a private draft; recompiled when the source DSL was valid |
 | POST | `/{id}/publish` | `compiled` → `published` |
+| POST | `/{id}/unpublish` | `published` → `compiled` (editable again) |
+
+Listing sort keys: `updated_at` (default), `created_at`, `name`, `sessions`.
+Each item carries `node_count`, `edge_count` and `session_count`, so a canvas
+picker renders many teams from one request without per-graph detail fetches.
 
 Compiler issue codes: `duplicate_node_key`, `orchestrator_count`,
 `orchestrator_key_mismatch`, `unknown_edge_endpoint`, `duplicate_dispatch_edge`,
@@ -66,7 +72,7 @@ Compiler issue codes: `duplicate_node_key`, `orchestrator_count`,
 | Method | Path | Description |
 |---|---|---|
 | POST | `` | Open session bound to a compiled graph (`graph_id`, `title?`) |
-| GET | `` | Paginated list of my sessions |
+| GET | `` | Paginated list of my sessions. `graph_id` scopes history to one canvas; `search` matches titles. Items carry `graph_name`, `graph_status`, `message_count`, `run_count` |
 | GET | `/{id}` | Session with token/cost accounting |
 | PATCH | `/{id}` | Rename / archive |
 | DELETE | `/{id}` | Delete session + history |

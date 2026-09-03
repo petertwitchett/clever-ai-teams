@@ -48,10 +48,15 @@ async def get_current_user(
             raise AuthenticationError("Invalid API key")
         return user
 
-    # 2. JWT bearer
-    if credentials is None or not credentials.credentials:
-        raise AuthenticationError("Missing credentials: provide a Bearer token or X-API-Key header")
-    payload = decode_access_token(credentials.credentials)
+    # 2. JWT bearer or query parameter token (for browser EventSource)
+    token = (
+        credentials.credentials
+        if (credentials and credentials.credentials)
+        else request.query_params.get("token") or request.query_params.get("access_token")
+    )
+    if not token:
+        raise AuthenticationError("Missing credentials: provide a Bearer token, X-API-Key header, or ?token= query parameter")
+    payload = decode_access_token(token)
     user_id = payload.get("sub")
     if not user_id:
         raise AuthenticationError("Token payload is missing the subject")

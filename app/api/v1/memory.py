@@ -17,6 +17,22 @@ from app.services.memory import MemoryService
 router = APIRouter(prefix="/memory", tags=["Agent Memory"], dependencies=[Depends(rate_limit)])
 
 
+@router.get("", response_model=Page[MemoryOut], summary="List all memories across person nodes")
+async def list_all_memories(
+    db: DBSession,
+    user: CurrentUser,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    memory_type: MemoryType | None = Query(default=None),
+) -> Page[MemoryOut]:
+    base = select(AgentMemory)
+    if memory_type is not None:
+        base = base.where(AgentMemory.memory_type == memory_type)
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+    rows = (await db.execute(base.order_by(AgentMemory.created_at.desc()).limit(limit).offset(offset))).scalars().all()
+    return Page(items=[MemoryOut.model_validate(m) for m in rows], total=total, limit=limit, offset=offset)
+
+
 @router.post(
     "/nodes/{node_id}",
     response_model=MemoryOut,

@@ -76,21 +76,28 @@ function ChatContent() {
   // Load Messages for Current Session
   useEffect(() => {
     if (!currentSession) return;
-    async function loadMessages() {
+    async function loadSessionData() {
       try {
         const msgs = await api.getSessionMessages(currentSession!.id);
         setMessages(msgs);
 
-        // Preload mock ledger state for demonstrated session
-        const run = await api.getRun(`run-${currentSession!.id}`);
-        setTaskLedger(run.task_ledger);
-        setProgressLedger(run.progress_ledger);
-        setCritiques(run.critiques);
+        // Load real run state from API
+        const runs = await api.getSessionRuns(currentSession!.id);
+        if (runs.length > 0) {
+          const latest = runs[0];
+          setTaskLedger(latest.task_ledger);
+          setProgressLedger(latest.progress_ledger);
+          setCritiques(latest.critiques);
+        } else {
+          setTaskLedger(null);
+          setProgressLedger(null);
+          setCritiques([]);
+        }
       } catch (err) {
-        console.error("Load messages failed:", err);
+        console.error("Load session messages and runs failed:", err);
       }
     }
-    loadMessages();
+    loadSessionData();
   }, [currentSession]);
 
   useEffect(() => {
@@ -100,7 +107,7 @@ function ChatContent() {
   // Create New Session
   const handleNewSession = async () => {
     try {
-      const gId = selectedGraphId || (graphs[0] ? graphs[0].id : "graph-market-intel");
+      const gId = selectedGraphId || (graphs[0] ? graphs[0].id : "");
       const title = `Session #${sessions.length + 1} (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`;
       const created = await api.createSession(gId, title);
       setSessions([created, ...sessions]);
@@ -119,13 +126,17 @@ function ChatContent() {
     const text = customText || inputText;
     if (!text.trim() || isStreaming) return;
 
-    if (!currentSession) {
-      await handleNewSession();
+    let sess = currentSession;
+    if (!sess) {
+      const gId = selectedGraphId || (graphs[0] ? graphs[0].id : "");
+      sess = await api.createSession(gId, `Session #${sessions.length + 1}`);
+      setSessions([sess, ...sessions]);
+      setCurrentSession(sess);
     }
 
-    const sessionId = currentSession?.id || `sess-${Date.now()}`;
-    const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
+    const sessionId = sess.id;
+    const clientMsg: ChatMessage = {
+      id: `client-${Date.now()}`,
       session_id: sessionId,
       sender_type: "user",
       sender_name: "You",
@@ -133,54 +144,15 @@ function ChatContent() {
       created_at: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev, clientMsg]);
     setInputText("");
     setIsStreaming(true);
-
-    // Initializing Outer Loop Task Ledger
-    setTaskLedger({
-      milestones: [
-        {
-          id: "m-1",
-          description: `Analyze objective: "${text.slice(0, 45)}..."`,
-          assigned_node: "Senior Researcher",
-          status: "in_progress",
-          verification_criteria: "Cross-check empirical sources and extract data",
-        },
-        {
-          id: "m-2",
-          description: "Dialectical cross-examination and fallacy audit",
-          assigned_node: "Analytical Critic",
-          status: "pending",
-          verification_criteria: "Audit logical validity and constitutional boundary compliance",
-        },
-        {
-          id: "m-3",
-          description: "Synthesize executive consensus response",
-          assigned_node: "Magentic Orchestrator",
-          status: "pending",
-          verification_criteria: "Comply with constitutional ethics and deliver final answer",
-        },
-      ],
-      facts: ["Directive ingested into Magentic-One outer task ledger."],
-      hypotheses: ["Multi-agent team can synthesize verified answer across 3 turns."],
-      stall_count: 0,
-      is_replanning: false,
-    });
-
-    setProgressLedger({
-      current_milestone_id: "m-1",
-      active_directive: `Extract factual grounds for query: "${text.slice(0, 50)}"`,
-      assigned_node: "Dr. Elena Vance (Senior Researcher)",
-      iteration: 1,
-      status: "executing",
-    });
 
     try {
       const { run_id } = await api.sendMessage(sessionId, text);
 
       // Subscribe to live SSE stream
-      const unsubscribe = subscribeToRunEvents(run_id, {
+      subscribeToRunEvents(run_id, {
         onLedgerUpdate: (tl, pl) => {
           setTaskLedger(tl);
           setProgressLedger(pl);
@@ -188,105 +160,28 @@ function ChatContent() {
         onAgentDebate: (crit) => {
           setCritiques((prev) => [...prev, crit]);
         },
-        onFinalChunk: (chunk) => {
-          // Append streaming chunks
-        },
-        onComplete: () => {
+        onFinalChunk: () => {},
+        onComplete: async () => {
           setIsStreaming(false);
+          const updatedMsgs = await api.getSessionMessages(sessionId);
+          setMessages(updatedMsgs);
+          const updatedRun = await api.getRun(run_id);
+          setTaskLedger(updatedRun.task_ledger);
+          setProgressLedger(updatedRun.progress_ledger);
+          setCritiques(updatedRun.critiques);
         },
-        onError: () => {
-          // Fallback simulation for seamless preview
-          simulateDeliberationProgress(text, sessionId);
+        onError: async () => {
+          setIsStreaming(false);
+          const updatedMsgs = await api.getSessionMessages(sessionId);
+          setMessages(updatedMsgs);
         },
       });
-    } catch {
-      simulateDeliberationProgress(text, sessionId);
+    } catch (err: any) {
+      console.error("SendMessage error:", err);
+      setIsStreaming(false);
+      const updatedMsgs = await api.getSessionMessages(sessionId);
+      setMessages(updatedMsgs);
     }
-  };
-
-  // Simulated progressive agent deliberation
-  const simulateDeliberationProgress = (userPrompt: string, sessionId: string) => {
-    setTimeout(() => {
-      // Step 1: Researcher response
-      const researcherMsg: ChatMessage = {
-        id: `msg-${Date.now()}-res`,
-        session_id: sessionId,
-        sender_type: "specialist",
-        sender_name: "Dr. Elena Vance (Senior Researcher)",
-        content: `**Empirical Data Retrieved:**\n- Surveyed multi-source metrics addressing: *"${userPrompt}"*.\n- Cross-checked 3 technical databases with sub-30 day citation freshness.\n- Passing intermediate artifact to Analytical Critic for dialectical cross-examination.`,
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, researcherMsg]);
-
-      setTaskLedger((prev) =>
-        prev
-          ? {
-              ...prev,
-              milestones: prev.milestones.map((m) =>
-                m.id === "m-1" ? { ...m, status: "verified" } : m.id === "m-2" ? { ...m, status: "in_progress" } : m
-              ),
-              facts: [...prev.facts, "Primary source telemetry verified by Senior Researcher."],
-            }
-          : null
-      );
-
-      setProgressLedger({
-        current_milestone_id: "m-2",
-        active_directive: "Audit empirical claims for bias and logic integrity",
-        assigned_node: "Marcus Aurelius Drake (Analytical Critic)",
-        iteration: 2,
-        status: "evaluating",
-      });
-
-      // Step 2: Critic response
-      setTimeout(() => {
-        const critiqueObj: DialecticalCritique = {
-          id: `crit-${Date.now()}`,
-          milestone_id: "m-2",
-          critic_node: "Marcus Aurelius Drake",
-          target_node: "Dr. Elena Vance",
-          critique_text: "Verified empirical citation bounds. Factual ground truth satisfied with 96% confidence score.",
-          accepted: true,
-          score: 0.96,
-          timestamp: new Date().toISOString(),
-        };
-        setCritiques((prev) => [...prev, critiqueObj]);
-
-        const criticMsg: ChatMessage = {
-          id: `msg-${Date.now()}-crit`,
-          session_id: sessionId,
-          sender_type: "specialist",
-          sender_name: "Marcus Aurelius Drake (Critic)",
-          content: `**Dialectical Consensus Reached:**\n- Zero logical fallacies identified.\n- Constitutional safety invariants respected.\n- Verification score: **96%**. Milestone M-2 approved.`,
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, criticMsg]);
-
-        // Step 3: Final synthesis
-        setTimeout(() => {
-          setTaskLedger((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  milestones: prev.milestones.map((m) => ({ ...m, status: "verified" })),
-                  facts: [...prev.facts, "Consensus approved by Critic."],
-                }
-              : null
-          );
-
-          const orchMsg: ChatMessage = {
-            id: `msg-${Date.now()}-orch`,
-            session_id: sessionId,
-            sender_type: "orchestrator",
-            sender_name: "Magentic Orchestrator",
-            content: `### Executive Team Resolution\n\nBased on collaborative deliberation between the **Senior Researcher** and **Analytical Critic**, the collective has formulated the following verified conclusion:\n\n1. **Core Findings**: The empirical inquiry into *"${userPrompt}"* has been substantiated against verified operational ground truth.\n2. **Strategic Recommendation**: Deploy models using strict constitutional invariants and isolated sandbox runtime parameters to maximize throughput while preventing procedural deviations.\n\n*Milestone M-3 Verified & Task Ledger closed with 0 stalls.*`,
-            created_at: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, orchMsg]);
-          setIsStreaming(false);
-        }, 1200);
-      }, 1400);
-    }, 1200);
   };
 
   const activeGraph = graphs.find((g) => g.id === selectedGraphId) || graphs[0];

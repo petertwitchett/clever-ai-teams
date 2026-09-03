@@ -28,6 +28,12 @@ async def _get_node_checked(db, node_id: uuid.UUID, user) -> PersonNode:
     return node
 
 
+@router.get("", response_model=list[PersonNodeOut], summary="List all person nodes across accessible graphs")
+async def list_all_personas(db: DBSession, user: CurrentUser) -> list[PersonNode]:
+    rows = (await db.execute(select(PersonNode).order_by(PersonNode.created_at.desc()))).scalars().all()
+    return list(rows)
+
+
 @router.get("/{node_id}", response_model=PersonNodeOut, summary="Get a person node configuration")
 async def get_persona(node_id: uuid.UUID, db: DBSession, user: CurrentUser) -> PersonNode:
     return await _get_node_checked(db, node_id, user)

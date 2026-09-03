@@ -14,7 +14,9 @@ export function subscribeToRunEvents(
   callbacks: SSECallbacks
 ): () => void {
   const baseUrl = api.getBaseUrl();
-  const sseUrl = `${baseUrl}/chat/runs/${runId}/events`;
+  const token = api.getToken();
+  const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : "";
+  const sseUrl = `${baseUrl}/chat/runs/${runId}/events${tokenQuery}`;
 
   let eventSource: EventSource | null = null;
 
@@ -71,8 +73,8 @@ export function subscribeToRunEvents(
     });
 
     eventSource.onerror = (err) => {
-      // If live SSE is unavailable (e.g. mock run), fallback to simulated progress
-      console.warn("SSE connection error or completed:", err);
+      // If live SSE stream encounters an error, notify caller
+      console.warn("SSE connection error or closed:", err);
       eventSource?.close();
       if (callbacks.onError) {
         callbacks.onError(err);

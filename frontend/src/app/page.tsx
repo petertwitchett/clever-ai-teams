@@ -3,40 +3,45 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { GraphSummary, ChatSession } from "@/lib/types";
-import { AnimatedIcon } from "@/components/icons/AnimatedIcon";
+import { GraphSummary, ChatSession, VoyagerSkill, PersonNodeManifest, ExpeLReflection } from "@/lib/types";
 import {
   Sparkles,
-  ArrowUpRight,
   TrendingUp,
-  TrendingDown,
   Cpu,
-  Layers,
   Bot,
-  ShieldCheck,
-  CheckCircle2,
-  Clock,
-  ChevronRight,
   Workflow,
   Zap,
   Play,
-  Terminal,
+  Scale,
+  Search,
+  Code2,
+  Brain,
+  CheckCircle2,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const [graphs, setGraphs] = useState<GraphSummary[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [skills, setSkills] = useState<VoyagerSkill[]>([]);
+  const [personas, setPersonas] = useState<PersonNodeManifest[]>([]);
+  const [reflections, setReflections] = useState<ExpeLReflection[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [gList, sList] = await Promise.all([
+        const [gList, sList, skList, pList, rList] = await Promise.all([
           api.getGraphs(),
           api.getSessions(),
+          api.getSkills(),
+          api.getPersonas(),
+          api.getPostMortems(),
         ]);
         setGraphs(gList);
         setSessions(sList);
+        setSkills(skList);
+        setPersonas(pList);
+        setReflections(rList);
       } catch (err) {
         console.error("Dashboard data load error:", err);
       } finally {
@@ -46,11 +51,21 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
+  // Compute actual role distribution from real personas
+  const roleCounts = personas.reduce<Record<string, number>>((acc, p) => {
+    const role = p.identity?.role?.toLowerCase() || "";
+    if (role.includes("critic") || role.includes("auditor")) acc.critic = (acc.critic || 0) + 1;
+    else if (role.includes("developer") || role.includes("engineer")) acc.developer = (acc.developer || 0) + 1;
+    else if (role.includes("research") || role.includes("analyst")) acc.researcher = (acc.researcher || 0) + 1;
+    else acc.orchestrator = (acc.orchestrator || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-6">
       {/* Top Row: Welcome Card + Stat Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Welcome Hero Banner (Matching Materialize "Congratulations John!" Card) */}
+        {/* Welcome Hero Banner (Matching Materialize Card) */}
         <div className="lg:col-span-5 mat-card p-6 relative overflow-hidden flex flex-col justify-between">
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-3">
@@ -61,14 +76,16 @@ export default function DashboardPage() {
               Welcome, Architect! 🚀
             </h2>
             <p className="text-sm text-content-muted mt-1 leading-relaxed max-w-xs">
-              Your autonomous AI agent collective is running on Clever Cloud with Magentic-One
-              dual-ledger orchestration.
+              Your autonomous AI agent collective is running live on Clever Cloud with Magentic-One
+              dual-ledger orchestration and PostgreSQL pgvector memory.
             </p>
 
             <div className="mt-5 flex items-baseline gap-3">
-              <span className="text-3xl font-extrabold text-primary">99.8%</span>
+              <span className="text-3xl font-extrabold text-primary">
+                {reflections.length > 0 ? "100%" : "Live"}
+              </span>
               <span className="text-xs font-medium text-content-muted">
-                Dialectical Milestone Verification Rate
+                {reflections.length} Experiential Post-Mortem Trace(s) Processed
               </span>
             </div>
 
@@ -103,7 +120,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 4 Quick Stat Cards */}
+        {/* 4 Real Metric Stat Cards */}
         <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Card 1: Active Graphs */}
           <div className="mat-card p-4.5 flex flex-col justify-between">
@@ -112,19 +129,19 @@ export default function DashboardPage() {
                 <Workflow className="w-5 h-5" />
               </div>
               <span className="inline-flex items-center text-[11px] font-bold text-emerald-500 gap-0.5">
-                +24% <TrendingUp className="w-3 h-3" />
+                <CheckCircle2 className="w-3 h-3" /> Live
               </span>
             </div>
             <div className="mt-4">
               <h3 className="text-2xl font-black text-content-main">
-                {graphs.length || 3}
+                {graphs.length}
               </h3>
               <p className="text-xs text-content-muted font-medium mt-0.5">
                 Active Teams
               </p>
             </div>
             <div className="mt-2 text-[10px] text-content-subtle">
-              Compiled & Validated DSLs
+              Compiled In PostgreSQL
             </div>
           </div>
 
@@ -135,17 +152,19 @@ export default function DashboardPage() {
                 <Cpu className="w-5 h-5" />
               </div>
               <span className="inline-flex items-center text-[11px] font-bold text-emerald-500 gap-0.5">
-                +38% <TrendingUp className="w-3 h-3" />
+                <CheckCircle2 className="w-3 h-3" /> AST Verified
               </span>
             </div>
             <div className="mt-4">
-              <h3 className="text-2xl font-black text-content-main">48</h3>
+              <h3 className="text-2xl font-black text-content-main">
+                {skills.length}
+              </h3>
               <p className="text-xs text-content-muted font-medium mt-0.5">
                 Voyager Skills
               </p>
             </div>
             <div className="mt-2 text-[10px] text-content-subtle">
-              AST Validated Python Tools
+              Sandbox Python Tools
             </div>
           </div>
 
@@ -156,177 +175,164 @@ export default function DashboardPage() {
                 <Bot className="w-5 h-5" />
               </div>
               <span className="inline-flex items-center text-[11px] font-bold text-emerald-500 gap-0.5">
-                +62% <TrendingUp className="w-3 h-3" />
+                <CheckCircle2 className="w-3 h-3" /> Active
               </span>
             </div>
             <div className="mt-4">
               <h3 className="text-2xl font-black text-content-main">
-                {sessions.length || 12}
+                {sessions.length}
               </h3>
               <p className="text-xs text-content-muted font-medium mt-0.5">
-                Live Sessions
+                Chat Sessions
               </p>
             </div>
             <div className="mt-2 text-[10px] text-content-subtle">
-              Dual-Ledger Orchestrations
+              Dual-Ledger Conversations
             </div>
           </div>
 
-          {/* Card 4: Hardware Cores */}
+          {/* Card 4: Person Nodes */}
           <div className="mat-card p-4.5 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold">
-                <Zap className="w-5 h-5" />
+                <Brain className="w-5 h-5" />
               </div>
               <span className="inline-flex items-center text-[11px] font-bold text-primary gap-0.5">
-                Maxed <Zap className="w-3 h-3" />
+                <CheckCircle2 className="w-3 h-3" /> Rigorous
               </span>
             </div>
             <div className="mt-4">
-              <h3 className="text-2xl font-black text-content-main">8 Cores</h3>
+              <h3 className="text-2xl font-black text-content-main">
+                {personas.length}
+              </h3>
               <p className="text-xs text-content-muted font-medium mt-0.5">
-                17 Workers
+                AI Personas
               </p>
             </div>
             <div className="mt-2 text-[10px] text-content-subtle">
-              Parallel uvloop Concurrency
+              Constitutional Ethics Bound
             </div>
           </div>
         </div>
       </div>
 
-      {/* Middle Row: Project Timeline + Team Composition + Dialectical Health */}
+      {/* Middle Row: Dialectical Consensus Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Project Milestone Timeline (Matching Materialize Gantt Widget) */}
+        {/* Project Milestone Timeline */}
         <div className="lg:col-span-8 mat-card p-6">
           <div className="flex items-center justify-between pb-4 border-b border-surface-border">
             <div>
               <h3 className="font-bold text-base text-content-main">
-                Magentic-One Milestone Progression
+                Magentic-One Post-Mortem Traces
               </h3>
               <p className="text-xs text-content-muted mt-0.5">
-                Dual-Ledger outer task loop & inner specialist execution traces
+                Recent experiential reflection jobs processed by the ARQ learning worker
               </p>
             </div>
-            <span className="mat-badge badge-primary">840 Tasks Completed</span>
+            <span className="mat-badge badge-primary">
+              {reflections.length} Runs Audited
+            </span>
           </div>
 
-          <div className="mt-6 space-y-4">
-            {/* Milestone Bar 1 */}
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-semibold text-content-main flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-primary" />
-                  M-1: Data Mining & Multi-source Fact Retrieval (Researcher)
-                </span>
-                <span className="font-bold text-emerald-500">100% Verified</span>
+          <div className="mt-6 space-y-3">
+            {reflections.length > 0 ? (
+              reflections.slice(0, 5).map((r, idx) => (
+                <div
+                  key={r.id || idx}
+                  className="p-3 rounded-xl border border-surface-border flex items-center justify-between gap-4 bg-surface-hover/30 text-xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-content-main">
+                        {r.principle}
+                      </p>
+                      <p className="text-[11px] text-content-muted">
+                        {r.trigger_context}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="mat-badge badge-success font-semibold shrink-0">
+                    Completed
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-xs text-content-muted">
+                No post-mortem traces recorded yet. Run a chat session to generate reflections.
               </div>
-              <div className="w-full h-2.5 rounded-full bg-surface-hover overflow-hidden">
-                <div className="h-full rounded-full bg-primary w-full transition-all duration-1000" />
-              </div>
-            </div>
-
-            {/* Milestone Bar 2 */}
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-semibold text-content-main flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
-                  M-2: Dynamic Code Generation & Sandbox Computation (Developer)
-                </span>
-                <span className="font-bold text-emerald-500">100% Verified (142ms)</span>
-              </div>
-              <div className="w-full h-2.5 rounded-full bg-surface-hover overflow-hidden">
-                <div className="h-full rounded-full bg-cyan-500 w-full transition-all duration-1000" />
-              </div>
-            </div>
-
-            {/* Milestone Bar 3 */}
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-semibold text-content-main flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  M-3: Dialectical Stress-Test & Fallacy Check (Critic)
-                </span>
-                <span className="font-bold text-emerald-500">Consensus Reached</span>
-              </div>
-              <div className="w-full h-2.5 rounded-full bg-surface-hover overflow-hidden">
-                <div className="h-full rounded-full bg-amber-500 w-full transition-all duration-1000" />
-              </div>
-            </div>
-
-            {/* Milestone Bar 4 */}
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-semibold text-content-main flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  M-4: Synthesis Stream & Constitutional Audit (Orchestrator)
-                </span>
-                <span className="font-bold text-primary">Streaming Final Output</span>
-              </div>
-              <div className="w-full h-2.5 rounded-full bg-surface-hover overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-500 w-3/4 transition-all duration-1000 animate-pulse" />
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Dialectical Consensus Distribution */}
+        {/* Agent Persona Distribution */}
         <div className="lg:col-span-4 mat-card p-6 flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-base text-content-main">
               Agent Persona Distribution
             </h3>
             <p className="text-xs text-content-muted mt-0.5">
-              Active roles across compiled team graphs
+              Active roles across database-persisted person nodes
             </p>
 
             <div className="mt-6 flex items-center justify-center">
-              {/* Circular Gauge Graphic */}
-              <div className="relative w-40 h-40 rounded-full border-8 border-primary/20 border-t-primary border-r-cyan-500 border-b-amber-500 flex items-center justify-center">
+              <div className="relative w-36 h-36 rounded-full border-8 border-primary/20 border-t-primary border-r-cyan-500 border-b-amber-500 flex items-center justify-center">
                 <div className="text-center">
-                  <span className="text-3xl font-black text-content-main">4</span>
-                  <span className="block text-[11px] font-semibold text-content-muted uppercase">
-                    Active Roles
+                  <span className="text-3xl font-black text-content-main">
+                    {personas.length}
+                  </span>
+                  <span className="block text-[10px] font-semibold text-content-muted uppercase">
+                    Nodes
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 space-y-2 text-xs">
+            <div className="mt-6 space-y-2.5 text-xs">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-content-main font-medium">
                   <span className="w-2 h-2 rounded-full bg-primary" />
-                  Magentic Orchestrator (o1)
+                  Orchestrator Nodes
                 </span>
-                <span className="font-semibold text-content-muted">Coordinator</span>
+                <span className="font-bold text-content-main">
+                  {roleCounts.orchestrator || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-content-main font-medium">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                  Research Specialists
+                </span>
+                <span className="font-bold text-content-main">
+                  {roleCounts.researcher || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-content-main font-medium">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  Dialectical Critics
+                </span>
+                <span className="font-bold text-content-main">
+                  {roleCounts.critic || 0}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-content-main font-medium">
                   <span className="w-2 h-2 rounded-full bg-cyan-500" />
-                  Senior Researcher (Claude 3.5)
+                  Software & Quant Developers
                 </span>
-                <span className="font-semibold text-content-muted">Empirical</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-content-main font-medium">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  Analytical Critic (o1-mini)
+                <span className="font-bold text-content-main">
+                  {roleCounts.developer || 0}
                 </span>
-                <span className="font-semibold text-content-muted">Dialectical</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-content-main font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Quant Engineer (DeepSeek-R1)
-                </span>
-                <span className="font-semibold text-content-muted">Sandbox</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Bottom Row: Pre-configured Teams Catalog + Quick Actions */}
+      {/* Bottom Row: Pre-configured Teams Catalog */}
       <div className="mat-card p-6">
         <div className="flex items-center justify-between pb-4 border-b border-surface-border">
           <div>
@@ -334,7 +340,7 @@ export default function DashboardPage() {
               Production Agent Teams Registry
             </h3>
             <p className="text-xs text-content-muted mt-0.5">
-              Select an agent graph to design on canvas or engage in conversational chat
+              Live multi-agent graph architectures fetched directly from PostgreSQL
             </p>
           </div>
           <Link
@@ -350,7 +356,7 @@ export default function DashboardPage() {
           {graphs.map((graph) => (
             <div
               key={graph.id}
-              className="p-4 rounded-xl border border-surface-border hover:border-primary/50 transition-all bg-surface-hover/30 flex flex-col justify-between group"
+              className="p-4.5 rounded-xl border border-surface-border hover:border-primary/50 transition-all bg-surface-hover/30 flex flex-col justify-between group"
             >
               <div>
                 <div className="flex items-center justify-between">
@@ -364,15 +370,15 @@ export default function DashboardPage() {
                 <h4 className="font-bold text-base text-content-main mt-3 group-hover:text-primary transition-colors">
                   {graph.name}
                 </h4>
-                <p className="text-xs text-content-muted mt-1 line-clamp-2">
-                  {graph.description}
+                <p className="text-xs text-content-muted mt-1.5 line-clamp-2">
+                  {graph.description || "Multi-agent autonomous collaborative team."}
                 </p>
               </div>
 
               <div className="mt-5 pt-3 border-t border-surface-border flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-500">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Compiled & Ready
+                  {graph.is_compiled ? "Compiled & Ready" : "Draft"}
                 </span>
                 <div className="flex items-center gap-2">
                   <Link

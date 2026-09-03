@@ -25,9 +25,11 @@ export default function PersonasPage() {
 
   useEffect(() => {
     async function load() {
-      const graphs = await api.getGraphs();
-      if (graphs[0]?.dsl?.nodes) {
-        setPersonas(graphs[0].dsl.nodes);
+      try {
+        const list = await api.getPersonas();
+        setPersonas(list);
+      } catch (err) {
+        console.error("Failed to load personas:", err);
       }
     }
     load();
